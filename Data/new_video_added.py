@@ -1,11 +1,12 @@
 import requests
 import re
 
-channel = "https://www.youtube.com/@hubermanlab/videos"
 
-html = requests.get(channel).text
-info = re.search('(?<={"label":").*?(?="})', html).group()
-url = "https://www.youtube.com/watch?v=" + re.search('(?<="videoId":").*?(?=")', html).group()
+def get_new_video_url(channel):
+    html = requests.get(channel).text
+    info = re.search('(?<={"label":").*?(?="})', html).group()
+    url = "https://www.youtube.com/watch?v=" + re.search('(?<="videoId":").*?(?=")', html).group()
 
-# print(info)
-print(url)
+    # print(info)
+    print(url)
+    return url

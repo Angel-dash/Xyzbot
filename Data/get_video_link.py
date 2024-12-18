@@ -1,12 +1,14 @@
 import os
 import requests
 from dotenv import load_dotenv
+from new_video_added import get_new_video_url
 import json
 
 load_dotenv()
 
 api_key = os.getenv('API_KEY')
 BASE_URL = "https://www.googleapis.com/youtube/v3"
+channel = "https://www.youtube.com/@hubermanlab/videos"
 
 
 def get_chanel_id(chanel_name):
@@ -58,7 +60,6 @@ def get_video_links(channel_id):
     return video_links
 
 
-
 def save_video_links(video_links, filename="video_links.json"):
     with open(filename, 'w') as file:
         json.dump(video_links, file)
@@ -92,3 +93,9 @@ if __name__ == "__main__":
             print("Failed to fetch video links")
     for link in video_links:
         print(link)
+    new_video_url = get_new_video_url(channel)
+    if new_video_url not in video_links:
+        video_links.append(new_video_url)
+        save_video_links(video_links)
+    else:
+        print("No new video founds")
