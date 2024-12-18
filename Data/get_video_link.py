@@ -26,32 +26,37 @@ def get_chanel_id(chanel_name):
 
 
 def get_video_links(channel_id):
-    url = f"{BASE_URL}/channels/search"
+    url = f"{BASE_URL}/search"
     video_links = []
     next_page_token = None
+
     while True:
         params = {
             "part": "snippet",
-            "channel_id": channel_id,
+            "channelId": channel_id,
             "maxResults": 50,
             "type": "video",
-            "key": api_key
+            "key": api_key,
         }
         if next_page_token:
             params["pageToken"] = next_page_token
-        response = requests.get(url, params)
+
+        response = requests.get(url, params=params)
         response_data = response.json()
 
         if "items" not in response_data:
             break
+
         for item in response_data["items"]:
             video_id = item["id"]["videoId"]
             video_links.append(f"https://www.youtube.com/watch?v={video_id}")
+
         next_page_token = response_data.get("nextPageToken")
         if not next_page_token:
             break
 
     return video_links
+
 
 
 def save_video_links(video_links, filename="video_links.json"):
