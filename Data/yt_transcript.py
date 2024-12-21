@@ -16,10 +16,15 @@ def get_video_id(video_links_list):
 
 def fetch_yt_transcript(video_ids):
     for id in video_ids:
-        output = YouTubeTranscriptApi.get_transcript(id)
-        for transcript in output:
-            sentence = transcript['text']
-            transcripts.append(sentence)
+        print(f"Fetching transcript for: {id}")
+        try:
+            output = YouTubeTranscriptApi.get_transcript(id)
+            for transcript in output:
+                transcripts.append(transcript['text'])
+            print(f"Finished fetching transcript for: {id}")
+        except Exception as e:
+            print(f"Transcript not found for video: {id}")
+            transcripts.append("")
     return transcripts
 
 
