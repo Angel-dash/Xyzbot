@@ -2,12 +2,8 @@ from youtube_transcript_api import YouTubeTranscriptApi
 
 from get_video_link import video_links_main
 
-video_links_list = video_links_main()
+transcripts = []
 
-
-# print("This is video links list")
-# print("*************************************")
-# print(video_links_list)
 
 def get_video_id(video_links_list):
     video_ids = []
@@ -18,6 +14,23 @@ def get_video_id(video_links_list):
     return video_ids
 
 
-video_ids = get_video_id(video_links_list)
-print("This is the list of video ids")
-print(video_ids)
+def fetch_yt_transcript(video_ids):
+    for id in video_ids:
+        output = YouTubeTranscriptApi.get_transcript(id)
+        for transcript in output:
+            sentence = transcript['text']
+            transcripts.append(sentence)
+    return transcripts
+
+
+def all_video_transcript_pipeline():
+    video_links_list = video_links_main()
+    video_ids = get_video_id(video_links_list)
+    full_transcripts = fetch_yt_transcript(video_ids)
+    return full_transcripts
+
+
+if __name__ == '__main__':
+    full_transcripts = all_video_transcript_pipeline()
+    print("this is full trnscirpts of all the youtube vides")
+    print(full_transcripts)
