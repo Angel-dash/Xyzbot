@@ -81,7 +81,7 @@ def load_video_links():
         return []
 
     # Sort files by the timestamp in their names (descending)
-    files.sort(key=lambda x: datetime.strptime(x[len("video_links_"):-len(".json")], "%Y%m%d_%H%M%S"), reverse=True)
+    files.sort(key=lambda x: datetime.strptime(x[len("video_links_"):-len(".json")], "%Y%m%d%H%M%S"), reverse=True)
 
     # Load the most recent file
     latest_file = files[0]
@@ -95,7 +95,7 @@ def load_video_links():
         return []
 
 
-if __name__ == "__main__":
+def video_links_main():
     video_links = load_video_links()
     if video_links:
         print(f"Using {len(video_links)} saved video links")
@@ -109,11 +109,16 @@ if __name__ == "__main__":
             save_video_links(video_links)
         else:
             print("Failed to fetch video links")
-    for link in video_links:
-        print(link)
+    # for link in video_links:
+    #     # print(link)
     new_video_url = get_new_video_url(channel)
     if new_video_url not in video_links:
         video_links.append(new_video_url)
         save_video_links(video_links)
     else:
         print("No new video founds")
+    return video_links
+
+
+if __name__ == "__main__":
+    video_links_main()
