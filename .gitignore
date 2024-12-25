@@ -115,7 +115,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-
+Data/transcripts/
+Data/videolinks/
 # Spyder project settings
 .spyderproject
 .spyproject
