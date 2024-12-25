@@ -55,9 +55,29 @@ def fetch_yt_transcript(video_ids):
 
 
 def all_video_transcript_pipeline():
-    video_links_list, new_video_added = video_links_main()
-    video_ids = get_video_id(video_links_list)
-    video_transcripts = fetch_yt_transcript(video_ids)
+    video_links_list, new_video_added,new_videos_link = video_links_main()
+    if new_video_added:
+        print("New videos has been added... Fetching transcript for new videos only")
+        new_videos_id = get_video_id(new_videos_link)
+        video_transcripts = fetch_yt_transcript(new_videos_link)
+    else:
+        print("No new video detected, Loading existing transcript from folders ")
+        video_transcripts = {}
+
+        transcripts_folder = "transcripts"
+        if os.path.exists(transcripts_folder):
+            existing_files = os.listdir(transcripts_folder)
+            for file in existing_files:
+                video_id = file.split("_")[0]
+                with open(os.path.join(transcripts_folder, file), "r", encoding="utf-8") as f:
+                    transcript_text = f.read().splitlines()
+                video_transcripts[video_id] = {
+                    'text': transcript_text,
+                    'file_path': os.path.join(transcripts_folder, file)
+                }
+            print(f"Loaded {len(video_transcripts)} transcripts from {transcripts_folder}")
+        else:
+            print("No transcript found")
     return video_transcripts
 
 
