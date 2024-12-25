@@ -132,7 +132,7 @@ def video_links_main():
         print("No new video founds")
         new_video_added = False
     # print(new_video_added)
-    return video_links, new_video_added
+    return video_links, new_video_added, new_videos
 
 
 if __name__ == "__main__":
