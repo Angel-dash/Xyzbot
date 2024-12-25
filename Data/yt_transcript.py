@@ -55,7 +55,13 @@ def fetch_yt_transcript(video_ids):
 
 
 def all_video_transcript_pipeline():
-    video_links_list, new_video_added = video_links_main()
+    video_links_list, new_video_added,new_videos_link = video_links_main()
+    if new_video_added:
+        print("New videos has been added... Fetching transcript for new videos only")
+        new_videos_id = get_video_id(new_videos_link)
+        video_transcripts = fetch_yt_transcript(new_videos_link)
+    else:
+        print("No new video detected ")
     video_ids = get_video_id(video_links_list)
     video_transcripts = fetch_yt_transcript(video_ids)
     return video_transcripts
