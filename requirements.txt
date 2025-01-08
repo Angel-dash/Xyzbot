@@ -1,2 +1,12 @@
-requests~=2.32.3
-python-dotenv~=1.0.1
+pyarrow
+pandas[performance, parquet, aws]
+pendulum
+google.generativeai
+langchain
+langchain_openai
+langchain_chroma
+langchain_community
+chromadb
+pypdf
+flask
+flask_cors
