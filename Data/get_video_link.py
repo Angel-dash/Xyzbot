@@ -1,17 +1,28 @@
 import os
 import requests
 from dotenv import load_dotenv
-from new_video_added import get_new_video_url
+from Data.new_video_added import get_new_video_url
 from datetime import datetime
 import json
 
 load_dotenv()
 
 api_key = os.getenv('API_KEY')
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_URL = "https://www.googleapis.com/youtube/v3"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 channel = "https://www.youtube.com/@hubermanlab/videos"
 new_video_added = False
-video_links_folder_name = "videolinks"
+# video_links_folder_name = os.path.join(BASE_DIR, "videolinks")
+print("THIS IS BASE DIR:", BASE_DIR)
+print("THIS is current dir:", CURRENT_DIR)
+video_links_folder_name = os.path.join(CURRENT_DIR, "videolinks")
+
+
+def ensure_directories():
+    if not os.path.exists(video_links_folder_name):
+        os.makedirs(video_links_folder_name)
+        print(f"Directory {video_links_folder_name} created")
 
 
 def get_chanel_id(chanel_name):
@@ -104,6 +115,7 @@ def load_video_links():
 
 
 def video_links_main():
+    ensure_directories()
     video_links = load_video_links()
     if video_links:
         print(f"Using {len(video_links)} saved video links")
