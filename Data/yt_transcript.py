@@ -101,7 +101,7 @@ def all_video_transcript_pipeline():
     return video_transcripts
 
 
-if __name__ == '__main__':
-    full_transcripts = all_video_transcript_pipeline()
-    print("this is full transcripts of all the youtube videos")
-    print(full_transcripts)
+# if __name__ == '__main__':
+#     full_transcripts = all_video_transcript_pipeline()
+#     print("this is full transcripts of all the youtube videos")
+#     print(full_transcripts)
