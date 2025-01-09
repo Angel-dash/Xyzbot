@@ -6,16 +6,25 @@ from datetime import datetime
 
 transcripts = []
 
+import os
+from datetime import datetime
 
-def save_transcript(video_id, transcript_text, folder_name="transcripts"):
-    if not os.path.exists(folder_name):
-        os.makedirs(folder_name)
+
+def save_transcript(video_id, transcript_text, folder_name="Data/transcripts"):
+   #using abosule path
+    base_dir = os.path.dirname(os.path.abspath(__file__))  # Directory of the current script
+    folder_path = os.path.join(base_dir, folder_name)
+
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     filename = f"{video_id}_{timestamp}.txt"
-    filepath = os.path.join(folder_name, filename)
+    filepath = os.path.join(folder_path, filename)
 
     with open(filepath, "w", encoding="utf-8") as f:
         f.write('\n'.join(transcript_text))
+
     return filepath
 
 
@@ -101,7 +110,7 @@ def all_video_transcript_pipeline():
     return video_transcripts
 
 
-if __name__ == '__main__':
-    full_transcripts = all_video_transcript_pipeline()
-    print("this is full transcripts of all the youtube videos")
-    print(full_transcripts)
+# if __name__ == '__main__':
+#     full_transcripts = all_video_transcript_pipeline()
+#     print("this is full transcripts of all the youtube videos")
+#     print(full_transcripts)
