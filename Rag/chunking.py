@@ -57,5 +57,7 @@ def split_text_to_chunks():
 all_splits = split_text_to_chunks()
 if all_splits:
     print(f"Total chunks created: {len(all_splits)}")
+    print(all_splits[0].metadata)
+    print(all_splits[1])
 else:
     print("Splitting failed. Check logs for details.")
