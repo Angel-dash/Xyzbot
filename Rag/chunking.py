@@ -1,13 +1,7 @@
-from langchain_google_genai import GoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import Chroma
 from langchain.chains import ConversationalRetrievalChain
 from langchain_community.document_loaders import TextLoader
 from langchain.schema import Document
-from langchain.memory import ConversationBufferMemory
-import google.generativeai as genai
-import os
-from typing import Dict, List
 import os
 import sys
 from Data.yt_transcript import all_video_transcript_pipeline
