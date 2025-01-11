@@ -3,7 +3,6 @@ from youtube_transcript_api import YouTubeTranscriptApi
 from Data.get_video_link import video_links_main
 import os
 from datetime import datetime
-
 transcripts = []
 
 import os
