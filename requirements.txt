@@ -10,4 +10,6 @@ chromadb
 pypdf
 flask
 flask_cors
-chromadb
+sentence_transformers
+tqdm
+torch
