@@ -5,8 +5,6 @@ from chromadb.config import Settings
 import chromadb
 from sentence_transformers import SentenceTransformer
 
-all_chunks = split_text_to_chunks()
-
 
 def get_existing_documents(collection):
     """Get all existing documents and their IDs from the collection"""
@@ -20,13 +18,13 @@ def get_existing_documents(collection):
     return existing_ids, existing_docs
 
 
-def generate_embeddings(splits, batch_size=32):
+def generate_embeddings_for_docs(documents, batch_size=32):
+    """Generate embeddings only for specific documents"""
     model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
-    texts = [chunk.page_content for chunk in splits]
     chunks_embeddings = []
-    with tqdm(total=len(texts), desc="Generating embeddings") as pbar:
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
+    with tqdm(total=len(documents), desc="Generating embeddings") as pbar:
+        for i in range(0, len(documents), batch_size):
+            batch = documents[i:i + batch_size]
             batch_embeddings = model.encode(batch)
             chunks_embeddings.extend(batch_embeddings)
             pbar.update(len(batch))
@@ -34,7 +32,7 @@ def generate_embeddings(splits, batch_size=32):
     return np.array(chunks_embeddings)
 
 
-def store_in_chroma(chunks, embeddings, update_existing=True):
+def store_in_chroma(chunks):
     # Initialize Chroma client
     client = chromadb.Client(Settings(
         persist_directory="db"
@@ -57,48 +55,46 @@ def store_in_chroma(chunks, embeddings, update_existing=True):
     # Get existing documents
     existing_ids, existing_docs = get_existing_documents(collection)
 
-    # Prepare new documents for insertion
-    new_docs = []
-    new_embeddings = []
-    new_ids = []
-    new_metadatas = []
+    # Filter out chunks that already exist
+    new_chunks = []
+    for chunk in chunks:
+        if chunk.page_content not in existing_docs:
+            new_chunks.append(chunk)
 
-    print("Checking for new documents...")
-    for i, chunk in enumerate(chunks):
-        doc_content = chunk.page_content
-        # Only add documents that don't exist
-        if doc_content not in existing_docs:
-            new_docs.append(doc_content)
-            new_embeddings.append(embeddings[i])
-            new_ids.append(str(len(existing_ids) + len(new_docs) - 1))
-            new_metadatas.append(chunk.metadata)
-
-    if new_docs:
-        print(f"Adding {len(new_docs)} new documents to collection...")
-        # Add only new documents to collection
-        collection.add(
-            ids=new_ids,
-            documents=new_docs,
-            embeddings=new_embeddings,
-            metadatas=new_metadatas
-        )
-        print(f"Added {len(new_docs)} new documents")
-    else:
+    if not new_chunks:
         print("No new documents to add")
+        return collection
+
+    print(f"Found {len(new_chunks)} new documents. Generating embeddings...")
+
+    # Prepare new documents for insertion
+    new_docs = [chunk.page_content for chunk in new_chunks]
+    new_metadatas = [chunk.metadata for chunk in new_chunks]
+    new_ids = [str(len(existing_ids) + i) for i in range(len(new_chunks))]
+
+    # Generate embeddings only for new documents
+    new_embeddings = generate_embeddings_for_docs(new_docs)
+
+    print(f"Adding {len(new_docs)} new documents to collection...")
+    # Add only new documents to collection
+    collection.add(
+        ids=new_ids,
+        documents=new_docs,
+        embeddings=new_embeddings.tolist(),
+        metadatas=new_metadatas
+    )
+    print(f"Added {len(new_docs)} new documents")
 
     return collection
 
 
 def main():
-    all_chunks = split_text_to_chunks()
+    print("Starting chunking process...")
+    chunks = split_text_to_chunks()
+    print(f"Generated {len(chunks)} chunks")
 
-    print(f"Starting embedding generation for {len(all_chunks)} chunks...")
-    embeddings = generate_embeddings(all_chunks)
-    print("Embeddings generated. Starting storage...")
-    collection = store_in_chroma(all_chunks, embeddings)
-
+    collection = store_in_chroma(chunks)
     print(f"Process complete. Collection contains {collection.count()} documents.")
-
     return collection
 
 
