@@ -4,47 +4,47 @@ import numpy as np
 from chromadb.config import Settings
 import chromadb
 from sentence_transformers import SentenceTransformer
+import os
 
 
 def get_existing_documents(collection):
     """Get all existing documents and their IDs from the collection"""
-    if collection.count() == 0:
+    try:
+        count = collection.count()
+        print(f"Found {count} existing documents in collection")
+
+        if count == 0:
+            return set(), {}
+
+        # Get all documents from collection
+        result = collection.get(include=['documents', 'ids'])
+        print(f"Successfully retrieved {len(result['documents'])} documents from collection")
+
+        existing_docs = {doc: id for doc, id in zip(result['documents'], result['ids'])}
+        existing_ids = set(result['ids'])
+        return existing_ids, existing_docs
+    except Exception as e:
+        print(f"Error getting existing documents: {str(e)}")
         return set(), {}
-
-    # Get all documents from collection
-    result = collection.get()
-    existing_docs = {doc: id for doc, id in zip(result['documents'], result['ids'])}
-    existing_ids = set(result['ids'])
-    return existing_ids, existing_docs
-
-
-def generate_embeddings_for_docs(documents, batch_size=32):
-    """Generate embeddings only for specific documents"""
-    model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
-    chunks_embeddings = []
-    with tqdm(total=len(documents), desc="Generating embeddings") as pbar:
-        for i in range(0, len(documents), batch_size):
-            batch = documents[i:i + batch_size]
-            batch_embeddings = model.encode(batch)
-            chunks_embeddings.extend(batch_embeddings)
-            pbar.update(len(batch))
-
-    return np.array(chunks_embeddings)
 
 
 def store_in_chroma(chunks):
-    # Initialize Chroma client
-    client = chromadb.Client(Settings(
-        persist_directory="db"
-    ))
+    # Ensure the db directory exists
+    db_path = os.path.abspath("db")
+    os.makedirs(db_path, exist_ok=True)
 
+    print(f"Using database path: {db_path}")
+
+    # Initialize Chroma client with persistent storage
+    client = chromadb.PersistentClient(
+        path=db_path,
+    )
     try:
         # Try to get existing collection
-        collection = client.get_collection(
-            name="transcript_collection"
-        )
+        collection = client.get_collection(name="transcript_collection")
         print("Found existing collection")
-    except:
+    except Exception as e:
+        print(f"No existing collection found ({str(e)}), creating new one...")
         # Create new collection if it doesn't exist
         collection = client.create_collection(
             name="transcript_collection",
@@ -54,6 +54,7 @@ def store_in_chroma(chunks):
 
     # Get existing documents
     existing_ids, existing_docs = get_existing_documents(collection)
+    print(f"Retrieved {len(existing_docs)} existing documents")
 
     # Filter out chunks that already exist
     new_chunks = []
@@ -61,11 +62,13 @@ def store_in_chroma(chunks):
         if chunk.page_content not in existing_docs:
             new_chunks.append(chunk)
 
+    print(f"Found {len(new_chunks)} new chunks out of {len(chunks)} total chunks")
+
     if not new_chunks:
         print("No new documents to add")
         return collection
 
-    print(f"Found {len(new_chunks)} new documents. Generating embeddings...")
+    print(f"Generating embeddings for {len(new_chunks)} new documents...")
 
     # Prepare new documents for insertion
     new_docs = [chunk.page_content for chunk in new_chunks]
@@ -73,17 +76,31 @@ def store_in_chroma(chunks):
     new_ids = [str(len(existing_ids) + i) for i in range(len(new_chunks))]
 
     # Generate embeddings only for new documents
-    new_embeddings = generate_embeddings_for_docs(new_docs)
+    model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
+    new_embeddings = []
+
+    batch_size = 32
+    with tqdm(total=len(new_docs), desc="Generating embeddings") as pbar:
+        for i in range(0, len(new_docs), batch_size):
+            batch = new_docs[i:i + batch_size]
+            batch_embeddings = model.encode(batch)
+            new_embeddings.extend(batch_embeddings)
+            pbar.update(len(batch))
 
     print(f"Adding {len(new_docs)} new documents to collection...")
-    # Add only new documents to collection
-    collection.add(
-        ids=new_ids,
-        documents=new_docs,
-        embeddings=new_embeddings.tolist(),
-        metadatas=new_metadatas
-    )
-    print(f"Added {len(new_docs)} new documents")
+    try:
+        # Add only new documents to collection
+        collection.add(
+            ids=new_ids,
+            documents=new_docs,
+            embeddings=new_embeddings,
+            metadatas=new_metadatas
+        )
+        # Explicitly persist the changes
+        client.persist()
+        print(f"Successfully added {len(new_docs)} new documents")
+    except Exception as e:
+        print(f"Error adding documents: {str(e)}")
 
     return collection
 
@@ -94,7 +111,8 @@ def main():
     print(f"Generated {len(chunks)} chunks")
 
     collection = store_in_chroma(chunks)
-    print(f"Process complete. Collection contains {collection.count()} documents.")
+    final_count = collection.count()
+    print(f"Process complete. Collection contains {final_count} documents.")
     return collection
 
 
