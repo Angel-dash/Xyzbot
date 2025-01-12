@@ -1,5 +1,3 @@
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_chroma import Chroma
 from Rag.chunking import split_text_to_chunks
 from tqdm import tqdm
 import numpy as np
@@ -10,7 +8,19 @@ from sentence_transformers import SentenceTransformer
 all_chunks = split_text_to_chunks()
 
 
-def generate_embeddings(splits, batch_size = 32):
+def get_existing_documents(collection):
+    """Get all existing documents and their IDs from the collection"""
+    if collection.count() == 0:
+        return set(), {}
+
+    # Get all documents from collection
+    result = collection.get()
+    existing_docs = {doc: id for doc, id in zip(result['documents'], result['ids'])}
+    existing_ids = set(result['ids'])
+    return existing_ids, existing_docs
+
+
+def generate_embeddings(splits, batch_size=32):
     model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
     texts = [chunk.page_content for chunk in splits]
     chunks_embeddings = []
@@ -24,49 +34,67 @@ def generate_embeddings(splits, batch_size = 32):
     return np.array(chunks_embeddings)
 
 
-def store_in_chroma(chunks, embeddings):
+def store_in_chroma(chunks, embeddings, update_existing=True):
     # Initialize Chroma client
     client = chromadb.Client(Settings(
-        persist_directory="db"  # This will store the database on disk
+        persist_directory="db"
     ))
 
-    # Create or get collection
-    collection = client.create_collection(
-        name="transcript_collection",
-        metadata={"description": "Video transcript embeddings"}
-    )
-
-    # Prepare data for insertion
-    ids = [str(i) for i in range(len(chunks))]
-    documents = [chunk.page_content for chunk in chunks]
-    metadatas = [chunk.metadata for chunk in chunks]
-
-    # Add data to collection
-    with tqdm(total=len(documents), desc="Storing in Chroma") as pbar:
-        # You might want to batch this too if dealing with very large datasets
-        collection.add(
-            ids=ids,
-            documents=documents,
-            embeddings=embeddings.tolist(),
-            metadatas=metadatas
+    try:
+        # Try to get existing collection
+        collection = client.get_collection(
+            name="transcript_collection"
         )
-        pbar.update(len(documents))
+        print("Found existing collection")
+    except:
+        # Create new collection if it doesn't exist
+        collection = client.create_collection(
+            name="transcript_collection",
+            metadata={"description": "Video transcript embeddings"}
+        )
+        print("Created new collection")
+
+    # Get existing documents
+    existing_ids, existing_docs = get_existing_documents(collection)
+
+    # Prepare new documents for insertion
+    new_docs = []
+    new_embeddings = []
+    new_ids = []
+    new_metadatas = []
+
+    print("Checking for new documents...")
+    for i, chunk in enumerate(chunks):
+        doc_content = chunk.page_content
+        # Only add documents that don't exist
+        if doc_content not in existing_docs:
+            new_docs.append(doc_content)
+            new_embeddings.append(embeddings[i])
+            new_ids.append(str(len(existing_ids) + len(new_docs) - 1))
+            new_metadatas.append(chunk.metadata)
+
+    if new_docs:
+        print(f"Adding {len(new_docs)} new documents to collection...")
+        # Add only new documents to collection
+        collection.add(
+            ids=new_ids,
+            documents=new_docs,
+            embeddings=new_embeddings,
+            metadatas=new_metadatas
+        )
+        print(f"Added {len(new_docs)} new documents")
+    else:
+        print("No new documents to add")
 
     return collection
 
 
 def main():
-    # Get your chunks from your existing code
     all_chunks = split_text_to_chunks()
 
     print(f"Starting embedding generation for {len(all_chunks)} chunks...")
-
-    # Generate embeddings
     embeddings = generate_embeddings(all_chunks)
-
     print("Embeddings generated. Starting storage...")
-
-    # Store in ChromaDB
     collection = store_in_chroma(all_chunks, embeddings)
 
     print(f"Process complete. Collection contains {collection.count()} documents.")
@@ -76,17 +104,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-def store_embeddings_in_chroma(chunk_embeddings):
-    vector_db = Chroma(
-        collection_name='transcript_knowledge_base',
-        embedding_function=GoogleGenerativeAIEmbeddings(),
-
-    )
-    for chunk in chunk_embeddings:
-        vector_db.add_texts(chunk['text'], embeddings=chunk['embedding'])
-    return vector_db
-
-
-transcripts_embeddings = generate_embeddings(all_chunks)
