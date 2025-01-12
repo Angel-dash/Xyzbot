@@ -13,6 +13,30 @@ The process of fetching new YouTube videos and extracting their transcripts is a
 - **Retrieval-Augmented Generation (RAG)**: The bot uses RAG to query the AI and retrieve information from video transcripts to answer user queries.
 - **Bot Interaction**: A chatbot interface answers questions based on the YouTube video transcripts.
 
+## How vector DB works 
+First Check for Vector DB:
+Tries to get existing collection named "transcript_collection"
+If not found, creates a new one
+If found, uses the existing one
+Document Comparison:
+Gets all existing documents from the database
+Takes your new text chunks
+Compares them to find which chunks are new (not in database)
+Processing New Content:
+If no new content is found → stops (nothing to do)
+If new content exists → only generates embeddings for these new chunks
+Update Database:
+Takes the new embeddings
+Adds them to the existing vector database
+Maintains all previous data while adding new content
+So if you have:
+
+Original DB with chunks A, B, C
+New text with chunks A, B, C, D, E
+It will only process and add D and E to the database
+This makes the process much more efficient since you're not reprocessing content that's already in the database!
+
+
 ## Project Structure
 
 ```bash
