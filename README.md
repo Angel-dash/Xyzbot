@@ -13,6 +13,7 @@ The process of fetching new YouTube videos and extracting their transcripts is a
 - **Retrieval-Augmented Generation (RAG)**: The bot uses RAG to query the AI and retrieve information from video transcripts to answer user queries.
 - **Bot Interaction**: A chatbot interface answers questions based on the YouTube video transcripts.
 
+
 ## Project Structure
 
 ```bash
