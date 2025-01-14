@@ -117,6 +117,8 @@ env.bak/
 venv.bak/
 Data/transcripts/
 Data/videolinks/
+Rag/db/chroma.sqlite3
+
 # Spyder project settings
 .spyderproject
 .spyproject
