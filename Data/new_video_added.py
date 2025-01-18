@@ -2,15 +2,6 @@ import requests
 import re
 
 
-# def get_new_video_url(channel):
-#     html = requests.get(channel).text
-#     videos_id = re.findall(r'(?<={"label":").*?(?="})', html)
-#     url = "https://www.youtube.com/watch?v=" + re.search('(?<="videoId":").*?(?=")', html).group()
-#
-#     # print(info)
-#     print(url)
-#     return url
-
 
 def get_new_video_url(channel):
     """
