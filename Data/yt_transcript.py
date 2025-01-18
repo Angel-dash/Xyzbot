@@ -10,8 +10,15 @@ from datetime import datetime
 
 
 def save_transcript(video_id, transcript_text, folder_name="Data/transcripts"):
+    """
+    Saves transcripts to the local folders
+    :param video_id:
+    :param transcript_text:
+    :param folder_name:
+    :return:
+    """
    #using abosule path
-    base_dir = os.path.dirname(os.path.abspath(__file__))  # Directory of the current script
+    base_dir = os.path.dirname(os.path.abspath(__file__))
     folder_path = os.path.join(base_dir, folder_name)
 
     if not os.path.exists(folder_path):
@@ -37,7 +44,12 @@ def get_video_id(video_links_list):
 
 
 def fetch_yt_transcript(video_ids):
-    video_transcripts = {}  # Dictionary to store transcripts for each video
+    """
+    fetched youtube transcirpts using videoids
+    :param video_ids:
+    :return: None
+    """
+    video_transcripts = {}
 
     for video_id in video_ids:
         print(f"Fetching transcript for: {video_id}")
@@ -64,7 +76,12 @@ def fetch_yt_transcript(video_ids):
 
 
 def all_video_transcript_pipeline():
-    # Get the Data directory path
+    """
+    Check if there is local folder called transcripts, if not then create one.
+    if there is then look if new video is added or not
+    if new video is added then fetch transcripts for the new video and saved it locally.
+    :return:None
+    """
     CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
     transcripts_folder = os.path.join(CURRENT_DIR, "transcripts")
 
@@ -102,9 +119,9 @@ def all_video_transcript_pipeline():
         new_video_ids = [url.split("v=")[1] for url in new_videos_link]  # Extract video IDs
         new_transcripts = fetch_yt_transcript(new_video_ids)
         # Merge new transcripts with existing ones
-        video_transcripts.update(new_transcripts)
-        print(f"Added {len(new_transcripts)} new transcripts")
+        # video_transcripts.update(new_transcripts)
+        # print(f"Added {len(new_transcripts)} new transcripts")
 
     print(f"Total transcripts loaded: {len(video_transcripts)}")
-    return video_transcripts
+
 
