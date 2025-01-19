@@ -251,3 +251,4 @@ flowcess/commons/settings.py
 Rag/db
 Rag/chromadb.db/chroma.sqlite3
 Rag/db/*
+Rag/chromadb.db
