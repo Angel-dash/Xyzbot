@@ -245,3 +245,5 @@ resources/test_xml_files/*
 resources/xml_files/*
 config.ini
 flowcess/commons/settings.py
+Rag/db
+*.db
