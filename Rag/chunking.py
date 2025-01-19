@@ -71,7 +71,7 @@ def generate_response(query_text, retrieved_docs):
     """Generate a response using retrieved documents and the generative AI model."""
     context = " ".join(retrieved_docs)
     prompt = f"Using the context below, answer the question:\n\nContext:\n{context}\n\nQuestion: {query_text}"
-    response = gemini_model.generate_content(prompt)
+    response = get_llm_response(prompt).split("```json\n[")[-1].split("\n]")[0]
     return response
 
 
