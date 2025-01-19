@@ -247,3 +247,4 @@ config.ini
 flowcess/commons/settings.py
 Rag/db
 *.db
+Rag/chromadb.db/chroma.sqlite3

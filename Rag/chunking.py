@@ -6,11 +6,9 @@ import os
 import json
 import logging
 from dotenv import load_dotenv
+from LLM.llm_endpoints import get_llm_response
 
 # Configuration
-load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-gemini_model = genai.GenerativeModel("models/gemini-1.5-flash")
 chromadb_path = "/home/nightwing/Codes/Xyzbot/Rag/chromadb.db"
 transcripts_folder_path = '/home/nightwing/Codes/Xyzbot/Data/transcripts'
 processed_files_path = "/home/nightwing/Codes/Xyzbot/Rag/Processed_folder/processed_files.json"
