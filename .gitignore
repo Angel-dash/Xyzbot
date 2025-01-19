@@ -245,3 +245,8 @@ resources/test_xml_files/*
 resources/xml_files/*
 config.ini
 flowcess/commons/settings.py
+Rag/db
+*.db
+Rag/chromadb.db/chroma.sqlite3
+Rag/chromadb.db/chroma.sqlite3
+Rag/db/*
