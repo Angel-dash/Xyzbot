@@ -1,8 +1,8 @@
 Traceback (most recent call last):
-  File "/home/nightwing/Codes/Xyzbot/Rag/chunking.py", line 52, in split_text_to_chunks
-    chunks = text_splitter.split_documents(docs)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/nightwing/anaconda3/envs/xyzbot/lib/python3.11/site-packages/langchain_text_splitters/base.py", line 94, in split_documents
-    texts.append(doc.page_content)
-                 ^^^^^^^^^^^^^^^^
-AttributeError: 'str' object has no attribute 'page_content'
+  File "/home/nightwing/Codes/Xyzbot/Rag/chunking.py", line 33, in split_text_to_chunks
+    docs = prepare_documents(full_transcripts)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nightwing/Codes/Xyzbot/Rag/chunking.py", line 26, in prepare_documents
+    for key, value in full_transcript.items():
+                      ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'items'

@@ -4,9 +4,6 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain_community.document_loaders import TextLoader
 from langchain.schema import Document
 import os
-import sys
-from Data.yt_transcript import all_video_transcript_pipeline
-import google.generativeai as genai
 
 PROJECT_ROOT = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(PROJECT_ROOT)
