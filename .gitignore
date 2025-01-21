@@ -119,7 +119,7 @@ Data/transcripts/
 Data/videolinks/
 Rag/db/
 Rag/db/chroma.sqlite3
-Rag.
+Rag/chromadb.db/
 # Spyder project settings
 .spyderproject
 .spyproject
@@ -248,7 +248,4 @@ resources/test_xml_files/*
 resources/xml_files/*
 config.ini
 flowcess/commons/settings.py
-Rag/db
-Rag/chromadb.db/chroma.sqlite3
-Rag/db/*
-Rag/chromadb.db
+
