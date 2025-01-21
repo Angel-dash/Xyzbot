@@ -7,60 +7,11 @@ import os
 import shutil
 
 
-def ensure_db_permissions():
-    """Ensure the database directory has correct permissions"""
-    db_path = os.path.abspath("db")
-
-    # Remove existing db if it exists
-    if os.path.exists(db_path):
-        try:
-            shutil.rmtree(db_path)
-            print("Removed existing database directory")
-        except Exception as e:
-            print(f"Error removing existing database: {str(e)}")
-            raise
-
-    # Create new directory with proper permissions
-    try:
-        os.makedirs(db_path, mode=0o777, exist_ok=True)
-        print(f"Created database directory with full permissions at: {db_path}")
-    except Exception as e:
-        print(f"Error creating database directory: {str(e)}")
-        raise
-
-    return db_path
-
-
-def store_in_chroma(chunks):
-    # Ensure proper database permissions
-    db_path = ensure_db_permissions()
-
-    # Initialize Chroma client with new configuration
-    client = chromadb.PersistentClient(path=db_path)
-
-    try:
-        # Create new collection
-        collection = client.create_collection(
-            name="transcript_collection",
-            metadata={"description": "Video transcript embeddings"}
-        )
-        print("Created new collection")
-    except Exception as e:
-        print(f"Error creating collection: {str(e)}")
-        raise
-
-    # Prepare documents for insertion
-    docs = [chunk.page_content for chunk in chunks]
-    metadatas = [chunk.metadata for chunk in chunks]
-    ids = [str(i) for i in range(len(chunks))]
-
-    print(f"Generating embeddings for {len(docs)} documents...")
-
-    # Generate embeddings
+def get_embeddings(docs, batch_size=32):
+    """Generate embeddings for documents using sentence transformer"""
     model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
     embeddings = []
 
-    batch_size = 32
     with tqdm(total=len(docs), desc="Generating embeddings") as pbar:
         for i in range(0, len(docs), batch_size):
             batch = docs[i:i + batch_size]
@@ -68,19 +19,76 @@ def store_in_chroma(chunks):
             embeddings.extend(batch_embeddings)
             pbar.update(len(batch))
 
-    print(f"Adding {len(docs)} documents to collection...")
+    return embeddings
+
+
+def initialize_chroma_client(db_path):
+    """Initialize ChromaDB client without removing existing database"""
+    if not os.path.exists(db_path):
+        try:
+            os.makedirs(db_path, mode=0o777, exist_ok=True)
+            print(f"Created database directory at: {db_path}")
+        except Exception as e:
+            print(f"Error creating database directory: {str(e)}")
+            raise
+
+    return chromadb.PersistentClient(path=db_path)
+
+
+def get_or_create_collection(client, collection_name="transcript_collection"):
+    """Get existing collection or create new one if it doesn't exist"""
     try:
-        # Add documents to collection
+        # Try to get existing collection
+        collection = client.get_collection(name=collection_name)
+        print(f"Found existing collection with {collection.count()} documents")
+        return collection
+    except Exception:
+        # Create new collection if it doesn't exist
+        collection = client.create_collection(
+            name=collection_name,
+            metadata={"description": "Video transcript embeddings"}
+        )
+        print("Created new collection")
+        return collection
+
+
+def process_new_chunks(chunks, collection):
+    """Process and add new chunks to the collection"""
+    # Prepare documents for insertion
+    docs = [chunk.page_content for chunk in chunks]
+    metadatas = [chunk.metadata for chunk in chunks]
+
+    # Generate new IDs starting after existing documents
+    start_id = collection.count()
+    ids = [str(i) for i in range(start_id, start_id + len(chunks))]
+
+    print(f"Generating embeddings for {len(docs)} new documents...")
+    embeddings = get_embeddings(docs)
+
+    print(f"Adding {len(docs)} new documents to collection...")
+    try:
         collection.add(
             ids=ids,
             documents=docs,
             embeddings=embeddings,
             metadatas=metadatas
         )
-        print(f"Successfully added {len(docs)} documents")
+        print(f"Successfully added {len(docs)} new documents")
     except Exception as e:
         print(f"Error adding documents: {str(e)}")
         raise
+
+
+def store_in_chroma(chunks, db_path="db"):
+    """Store chunks in ChromaDB, handling both new and existing databases"""
+    # Initialize client without removing existing DB
+    client = initialize_chroma_client(db_path)
+
+    # Get existing collection or create new one
+    collection = get_or_create_collection(client)
+
+    # Process and add new chunks
+    process_new_chunks(chunks, collection)
 
     return collection
 
