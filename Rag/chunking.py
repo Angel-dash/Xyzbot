@@ -68,10 +68,23 @@ def query_database(collection, query_text, n_results=3):
     metadatas = results['metadatas'][0]
     return retrieved_docs, metadatas
 
+def update_conversation_history(history, user_query, bot_response):
+    """
+    Update and keeps track of conversation history between user and the bot
+    :param history:
+    :param user_query:
+    :param bot_response:
+    :return:
+    """
+    history.append({"user":user_query, "bot":bot_response})
+    return history
 
-def generate_response(query_text, retrieved_docs):
+
+def generate_response(conversation_history,query_text, retrieved_docs):
     """Generate a response using retrieved documents and the generative AI model."""
+
     context = " ".join(retrieved_docs)
+    history_str = "\n".join([f"User: {turn['user']}\nBot: {turn['bot']}" for turn in conversation_history])
     prompt = f"Using the context below, answer the question:\n\nContext:\n{context}\n\nQuestion: {query_text}"
     response = get_llm_response(prompt)
     return response
@@ -87,18 +100,26 @@ def main_workflow(transcripts_folder_path, collection):
     else:
         logging.info("No new files found. Using existing database.")
 
-    # User query
-    query_text = input("Enter your query: ")
-    retrieved_docs, metadatas = query_database(collection, query_text)
+    #Initialize conversation history
+    conversation_history = []
 
-    if not retrieved_docs:
-        print("No relevant documents found.")
-        return
+    while True:
+        query_text = input("\nEnter your query(or type 'exit' to end):")
+        if query_text.lower() == "exit":
+            print("Ending the conversation. Goodbye")
+            break
 
-    # Generate response
-    response = generate_response(query_text, retrieved_docs)
-    print("\nGenerated Response:")
-    print(response)
+        retrived_docs, metadatas = query_database(collection, query_text)
+        print("-"*50)
+        print(metadatas)
+        print("-"*50)
+        if not retrived_docs:
+            print("No relevent documents is found")
+            continue
+        response = generate_response(conversation_history,query_text,retrived_docs)
+        conversation_history = update_conversation_history(conversation_history,query_text,response)
+        print("\nGenerated Response:")
+        print(response)
 
 
 # Run the application
