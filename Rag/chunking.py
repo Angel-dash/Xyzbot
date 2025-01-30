@@ -6,6 +6,8 @@ import os
 import json
 import logging
 from Llm.llm_endpoints import get_llm_response
+from Rag.summarization import summarize_conversation
+from Rag.corefrence import resolve_coreference_in_query
 # Configuration
 API_KEY = os.getenv("GOOGLE_API_KEY")
 if API_KEY:
@@ -68,6 +70,12 @@ def query_database(collection, query_text, n_results=3):
     metadatas = results['metadatas'][0]
     return retrieved_docs, metadatas
 
+
+def enhance_query_with_history(query_text, summarized_history):
+    enhance_query = f"{query_text}*2\n\n{summarized_history}"
+    return enhance_query
+
+
 def update_conversation_history(history, user_query, bot_response):
     """
     Update and keeps track of conversation history between user and the bot
@@ -76,16 +84,27 @@ def update_conversation_history(history, user_query, bot_response):
     :param bot_response:
     :return:
     """
-    history.append({"user":user_query, "bot":bot_response})
+    history.append({"user": user_query, "bot": bot_response})
     return history
 
 
-def generate_response(conversation_history,query_text, retrieved_docs):
+def generate_response(conversation_history, query_text, retrieved_docs):
     """Generate a response using retrieved documents and the generative AI model."""
 
     context = " ".join(retrieved_docs)
     history_str = "\n".join([f"User: {turn['user']}\nBot: {turn['bot']}" for turn in conversation_history])
-    prompt = f"Using the context below, answer the question:\n\nContext:\n{context}\n\nQuestion: {query_text}"
+    prompt = f"""
+    Using the context below and the conversation history, answer the question:
+
+    Context:
+    {context}
+
+    Conversation History:
+    {history_str}
+
+    Question: {query_text}
+    """
+
     response = get_llm_response(prompt)
     return response
 
@@ -108,16 +127,17 @@ def main_workflow(transcripts_folder_path, collection):
         if query_text.lower() == "exit":
             print("Ending the conversation. Goodbye")
             break
-
-        retrived_docs, metadatas = query_database(collection, query_text)
-        print("-"*50)
+        query_text_with_conversation_history = enhance_query_with_history(query_text, conversation_history)
+        resolved_query = resolve_coreference_in_query(query_text_with_conversation_history, conversation_history)
+        retrived_docs, metadatas = query_database(collection, resolved_query)
+        print("-" * 50)
         print(metadatas)
-        print("-"*50)
+        print("-" * 50)
         if not retrived_docs:
             print("No relevent documents is found")
             continue
-        response = generate_response(conversation_history,query_text,retrived_docs)
-        conversation_history = update_conversation_history(conversation_history,query_text,response)
+        response = generate_response(conversation_history, query_text, retrived_docs)
+        conversation_history = update_conversation_history(conversation_history, query_text, response)
         print("\nGenerated Response:")
         print(response)
 
