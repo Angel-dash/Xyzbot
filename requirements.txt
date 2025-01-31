@@ -13,3 +13,4 @@ flask_cors
 sentence_transformers
 tqdm
 torch
+transformers
