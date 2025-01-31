@@ -129,7 +129,11 @@ Rag/chromadb.db/
 
 # mkdocs documentation
 /site
-
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
 # mypy
 .mypy_cache/
 .dmypy.json

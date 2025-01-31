@@ -1,6 +1,6 @@
 from transformers import pipeline
 
-coref_pipeline = pipeline("coref-resolution", model="coref-spanbert-large")
+coref_pipeline = pipeline("coref-resolution", model="coref-roberta-large")
 
 
 def resolve_coreference_in_query(query_text, conversation_history):
