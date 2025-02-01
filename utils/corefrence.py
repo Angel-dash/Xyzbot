@@ -1,11 +1,14 @@
-from transformers import pipeline
-
-coref_pipeline = pipeline("coref-resolution", model="coref-roberta-large")
-
-
-def resolve_coreference_in_query(query_text, conversation_history):
-    context = "\n".join([f"User: {turn['user']}\nBot: {turn['bot']}" for turn in conversation_history])
-    full_text = f"{context}\nUser: {query_text}"
-    resolved_text = coref_pipeline(full_text)
-    resolved_query = resolved_text.split("User:")[-1].strip()
-    return resolved_query
+import spacy
+nlp = spacy.load('en_core_web_sm')
+nlp.add_pipe("coreferee")
+def resolve_corefrence(query_text, conversation_history):
+    combined_text = []
+    for turn in conversation_history:
+        combined_text.append(f"User:{turn['user']}")
+        combined_text.append(f"Bot:{turn['Bot']}")
+    combined_text.append(f"User:{query_text}")
+    combined_text = "\n".join(combined_text)
+    doc = nlp(combined_text)
+    resolved_text = doc._.corefrence_resolved
+    resolved_query = resolved_text.split('\n')[-1].replace("User: ", "")
+    return resolved_query.strip()

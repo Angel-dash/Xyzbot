@@ -6,7 +6,7 @@ langchain
 langchain_openai
 langchain_chroma
 langchain_community
-chromadb
+chromadb==0.4.8
 pypdf
 flask
 flask_cors
@@ -14,3 +14,5 @@ sentence_transformers
 tqdm
 torch
 transformers
+spacy==3.5.0
+coreferee==1.4.1
