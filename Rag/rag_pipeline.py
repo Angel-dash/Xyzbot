@@ -6,7 +6,8 @@ import os
 import logging
 from Llm.llm_endpoints import get_llm_response
 from utils.get_link import get_source_link
-from utils.corefrence import resolve_corefrence
+from utils.corefrence import resolve_coreferences
+from Prompts.huberman_prompt import huberman_prompt
 # Configuration
 API_KEY = os.getenv("GOOGLE_API_KEY")
 if API_KEY:
@@ -94,20 +95,12 @@ def generate_response(conversation_history, query_text, retrieved_docs, source_l
     history_str = "\n".join([f"User: {turn['user']}\nBot: {turn['bot']}" for turn in conversation_history])
     sources_str = "\n".join(source_links)
 
-    prompt = f"""
-    Using the context below and the conversation history, answer the question:
-
-    Context:
-    {context}
-
-    Conversation Sources:
-    {sources_str}
-
-    Conversation History:
-    {history_str}
-
-    Question: {query_text}
-    """
+    prompt = huberman_prompt.format(
+        context=context,
+        sources=sources_str,
+        history=history_str,
+        question=query_text
+    )
 
     response = get_llm_response(prompt)
 
@@ -134,7 +127,7 @@ def main_workflow(transcripts_folder_path, collection):
         if query_text.lower() == "exit":
             print("Ending the conversation. Goodbye")
             break
-        resolved_query = resolve_corefrence(query_text, conversation_history)
+        resolved_query = resolve_coreferences(query_text, conversation_history)
         query_text_with_conversation_history = enhance_query_with_history(resolved_query, conversation_history)
         # resolved_query = resolve_coreference_in_query(query_text_with_conversation_history, conversation_history)
         retrived_docs, metadatas = query_database(collection, query_text_with_conversation_history)
