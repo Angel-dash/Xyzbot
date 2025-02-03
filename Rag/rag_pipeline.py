@@ -6,7 +6,7 @@ import os
 import logging
 from Llm.llm_endpoints import get_llm_response
 from utils.get_link import get_source_link
-from utils.corefrence import resolve_coreferences
+# from utils.corefrence import resolve_coreferences
 from Prompts.huberman_prompt import huberman_prompt
 # Configuration
 API_KEY = os.getenv("GOOGLE_API_KEY")
@@ -127,8 +127,8 @@ def main_workflow(transcripts_folder_path, collection):
         if query_text.lower() == "exit":
             print("Ending the conversation. Goodbye")
             break
-        resolved_query = resolve_coreferences(query_text, conversation_history)
-        query_text_with_conversation_history = enhance_query_with_history(resolved_query, conversation_history)
+        # resolved_query = resolve_coreferences(query_text, conversation_history)
+        query_text_with_conversation_history = enhance_query_with_history(query_text, conversation_history)
         # resolved_query = resolve_coreference_in_query(query_text_with_conversation_history, conversation_history)
         retrived_docs, metadatas = query_database(collection, query_text_with_conversation_history)
         print("-" * 50)
