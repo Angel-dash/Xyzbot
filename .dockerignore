@@ -1,0 +1,36 @@
+# Ignore virtual environments and cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyc
+.venv/
+venv/
+__pycache__/
+*.sqlite3-journal
+
+# Ignore IDE files
+.idea/
+.vscode/
+
+# Ignore development files
+*.swp
+*.swo
+*.swn
+*.swo
+*.swn
+*.swn
+*.swo
+*.swn
+*.swo
+*.swn
+
+# Ignore data files
+chromadb.db
+chroma.sqlite3
+Rag/chromadb.db
+# Ignore setup scripts
+setup.sh
+
+# Ignore environment files
+.env
