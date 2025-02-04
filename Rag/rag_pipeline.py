@@ -123,7 +123,7 @@ def main_workflow(transcripts_folder_path, collection):
     conversation_history = []
 
     while True:
-        query_text = input("\nEnter your query(or type 'exit' to end):")
+        query_text = input("\nEnter your query(or type 'exit' to end):").strip()
         if query_text.lower() == "exit":
             print("Ending the conversation. Goodbye")
             break
