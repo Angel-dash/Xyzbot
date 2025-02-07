@@ -13,13 +13,13 @@ API_KEY = os.getenv("GOOGLE_API_KEY")
 if API_KEY:
     genai.configure(api_key=API_KEY)
 
-chromadb_path = "Rag/chromadb.db"
+chromadb_path = "app/Rag/chromadb.db"
 # transcripts_folder_path = '/home/nightwing/Codes/Xyzbot/Data/transcripts'
 # processed_files_path = "/home/nightwing/Codes/Xyzbot/Rag/Processed_folder/processed_files.json"
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 
-client = chromadb.PersistentClient(path=chromadb_path)
-collection = client.get_or_create_collection(name="yt_transcript_collection")
+# client = chromadb.PersistentClient(path=chromadb_path)
+# collection = client.get_or_create_collection(name="yt_transcript_collection")
 
 # Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
