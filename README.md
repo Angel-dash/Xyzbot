@@ -1,112 +1,98 @@
-# Andrew Huberman RAG-Based AI Chatbot Using YouTube Videos
+# Andrew Huberman RAG-Based AI Chatbot
 
-## 📌 Overview
-Xyzbot is an AI chatbot designed to mimic Andrew Huberman by fetching and analyzing YouTube video transcripts from his channel. It automatically retrieves transcripts when new videos are uploaded, updates its knowledge base in ChromaDB, and provides citations linking to the specific video sources. The application is built using Streamlit and deployed in a Docker container.
+## Overview
+Xyzbot is an AI chatbot that extracts and synthesizes insights from Andrew Huberman's YouTube videos. It automatically retrieves video transcripts, updates its knowledge base in ChromaDB, and provides citation-linked responses.
 
-## 🚀 Features
-- Mimics Andrew Huberman by extracting insights from his YouTube videos
-- Automatically fetches transcripts when new videos are uploaded
-- Stores and updates knowledge base using ChromaDB
-- Uses RAG to generate accurate, citation-linked responses
-- Provides direct links to cited YouTube videos
-- Interactive Streamlit UI for seamless user experience
-- Deployed using Docker for easy scalability and portability
+## 🚀 Key Features
+- Mimics Andrew Huberman's insights using YouTube video transcripts
+- Automatic transcript retrieval and knowledge base updates
+- RAG-powered response generation with direct video citations
+- Interactive Streamlit user interface
+- Docker-based deployment for easy scalability
 
 ## 🛠 Tech Stack
-- **Backend**: Python, LangChain, OpenAI API
-- **Frontend**: Streamlit
-- **Database**: ChromaDB (Vector Store)
-- **Deployment**: Docker
+- Backend: Python, LangChain, OpenAI API
+- Frontend: Streamlit
+- Database: ChromaDB
+- Deployment: Docker
 
 ## 📂 Project Structure
 ```
 📦 Xyzbot
 ├── 📂 Data
 ├── 📂 Example
-│   ├── __init__.py
-│   ├── rag_example.py
 ├── 📂 Llm
-│   ├── __init__.py
-│   ├── llm_endpoints.py
 ├── 📂 Notebook
 ├── 📂 Prompts
-│   ├── __init__.py
-│   ├── huberman_prompt.py
-│   ├── summary_prompt.py
 ├── 📂 Rag
 │   ├── chromadb.db
-│   ├── 📂 Processed_folder
-│   │   ├── __init__.py
-│   │   ├── error_log.txt
-│   ├── rag_pipeline.py
+│   └── 📂 Processed_folder
 ├── 📂 utils
-│   ├── __init__.py
-│   ├── corefrence.py
-│   ├── get_link.py
-│   ├── summarization.py
-├── .dockerignore
-├── .env
-├── .gitignore
 ├── Dockerfile
-├── poetry.lock
-├── pyproject.toml
+└── pyproject.toml
 ```
 
-## 🔧 Installation
-1. Clone the repository:
+## 🔧 Prerequisites
+- Python 3.8+
+- Docker (optional)
+
+## 🔑 API Keys Required
+1. Google Gemini API Key
+2. YouTube API Key
+
+## 🚀 Installation
+
+### Local Setup
+1. Clone the repository
    ```bash
    git clone https://github.com/Angel-dash/Xyzbot.git
    cd Xyzbot
    ```
-2. Create a virtual environment and install dependencies:
+
+2. Create virtual environment
    ```bash
    python3 -m venv venv
-   source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+   source venv/bin/activate
    pip install -r requirements.txt
    ```
-## 🎯 API Keys Required
-To run this project, you'll need to obtain the following API keys:
 
-- **Google Gemini API Key** (For language processing and AI capabilities)
-- **YouTube API Key** (For fetching transcripts from YouTube)
+### Docker Setup
 
-### How to Get Your API Keys:
-- **Google Gemini API Key**: [Sign up for Google Cloud and generate an API key here](https://cloud.google.com/docs/authentication/getting-started).
-- **YouTube API Key**: [Get your YouTube API key from the Google Developer Console](https://console.developers.google.com/).
+#### Option 1: Build Locally
+```bash
+docker build -t xyzbot:v1.0 .
+docker run -it \
+  -v $(pwd)/Rag:/app/Rag:rw \
+  -e GOOGLE_API_KEY=your_api_key \
+  xyzbot:v1.0
+```
 
+#### Option 2: Pull from Docker Hub
+```bash
+docker pull angeldash/xyzbot:v1.0
+docker run -it \
+  -v $(pwd)/Rag:/app/Rag:rw \
+  -e GOOGLE_API_KEY=your_api_key \
+  angeldash/xyzbot:v1.0
+```
 
-## ▶️ Running the Application
-1. Start the Streamlit app:
-   ```bash
-   streamlit run src/main.py
-   ```
-2. Open `http://localhost:8501/` in your browser.
+## 🖥️ Running the Application
+```bash
+streamlit run src/main.py
+```
 
-## 🐳 Running with Docker
-1. Build the Docker image:
-   ```bash
-   docker build -t xyzbot:latest .
-   ```
-2. Run the container:
-   ```bash
-   docker run -p 8501:8501 xyzbot:latest
-   ```
-
-## 📌 Future Enhancements
-- Improve response generation with fine-tuned LLMs
-- Enable real-time monitoring of multiple YouTube channels
-- Enhance citation formatting for better user experience
-- Provide timestamps for specific content along with the links
-- AI agent ability to detect greetings and unrelated topics
-- Improve RAG by using a hybrid method
-- Implement caching for better performance
+## 📈 Future Roadmap
+- Fine-tuned LLM response generation
+- Real-time multi-channel monitoring
+- Enhanced citation formatting
+- AI agent conversation handling
+- Performance optimization
 
 ## 📜 License
-This project is licensed under the MIT License.
+MIT License
 
 ## 🤝 Contributing
-Contributions are welcome! Feel free to open an issue or submit a pull request.
+Contributions are welcome! Open an issue or submit a pull request.
 
 ---
-**Author:** Angel Dash | **GitHub:** [Angel-dash](https://github.com/Angel-dash)
-
+**Author:** Angel Dash | **GitHub:** [@Angel-dash](https://github.com/Angel-dash)
