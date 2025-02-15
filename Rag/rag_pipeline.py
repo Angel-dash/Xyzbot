@@ -8,7 +8,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from Llm.llm_endpoints import get_llm_response
 from utils.get_link import get_source_link
 from Prompts.huberman_prompt import huberman_prompt
-
+from tqdm import tqdm
 # Configuration
 API_KEY = os.getenv("GOOGLE_API_KEY")
 if API_KEY:
@@ -44,12 +44,12 @@ def process_single_file(file_path):
     return chunks, os.path.basename(file_path)
 
 
-def batch_embed_chunks(chunks, batch_size=8):
+def batch_embed_chunks(chunks, batch_size=32):
     """Embed chunks in batches."""
     embeddings = []
-    for i in range(0, len(chunks), batch_size):
+    for i in tqdm(range(0, len(chunks), batch_size),desc = "Embedding chunks"):
         batch = chunks[i:i + batch_size]
-        batch_embeddings = embedding_model.encode(batch, show_progress_bar=False)
+        batch_embeddings = embedding_model.encode(batch, show_progress_bar=True)
         embeddings.extend(batch_embeddings.tolist())
     return embeddings
 
