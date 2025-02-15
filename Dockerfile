@@ -46,4 +46,4 @@ USER appuser
 # Make sure your Python code uses this path for ChromaDB
 ENV CHROMA_PERSISTENCE_DIRECTORY=/app/Rag/chromadb.db
 
-CMD ["python", "-m", "Example.rag_example"]
+CMD ["python", "-m","ui.app"]
