@@ -4,8 +4,15 @@ from typing import List, Dict
 import sys
 from pathlib import Path
 
-project_root = Path(__file__).parent.parent
+project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
+sys.path.append(str(project_root / "Rag"))
+sys.path.append(str(project_root / "Data"))
+sys.path.append(str(project_root / "Data" / "transcripts"))
+sys.path.append(str(project_root / "Data" / "video_links"))
+sys.path.append(str(project_root / "Llm"))
+sys.path.append(str(project_root / "Prompts"))
+sys.path.append(str(project_root / "utils"))
 from Rag.rag_pipeline import (
     query_database,
     generate_response,

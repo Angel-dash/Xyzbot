@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from Data.new_video_added import get_new_video_url
 from datetime import datetime
 import json
-
+from pathlib import Path
 load_dotenv()
 
 api_key = os.getenv('API_KEY')
@@ -14,10 +14,11 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 channel = "https://www.youtube.com/@hubermanlab/videos"
 new_video_added = False
 # video_links_folder_name = os.path.join(BASE_DIR, "videolinks")
-print("THIS IS BASE DIR:", BASE_DIR)
-print("THIS is current dir:", CURRENT_DIR)
-video_links_folder_name = os.path.join(CURRENT_DIR, "videolinks")
-
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# print("THIS IS BASE DIR:", BASE_DIR)
+# print("THIS is current dir:", CURRENT_DIR)
+# video_links_folder_name = os.path.join(CURRENT_DIR, "videolinks")
+video_links_folder_name = os.path.join(PROJECT_ROOT, "Data", "video_links")
 
 def ensure_directories():
     if not os.path.exists(video_links_folder_name):
