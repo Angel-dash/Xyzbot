@@ -7,7 +7,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 transcripts_folder_path = PROJECT_ROOT / "Data" / "transcripts"
 chromadb_path = PROJECT_ROOT / "Rag" / "chromadb.db"
 client = chromadb.PersistentClient(path=str(chromadb_path))
+
 collection = client.get_or_create_collection(name="yt_transcript_collection")
+collections = client.list_collections()
+print(f"Available collections: {collections}")
 sys.path.append(str(PROJECT_ROOT))
 sys.path.append(str(PROJECT_ROOT / "Rag"))
 # print("Python path:", sys.path)
