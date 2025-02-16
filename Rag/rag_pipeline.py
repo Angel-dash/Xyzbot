@@ -62,7 +62,7 @@ def process_and_add_new_files(transcripts_folder_path, collection):
         return False
 
     # Use a reasonable number of workers (4 is usually a good default)
-    n_workers = min(4, len(new_files))
+    n_workers = min(8, len(new_files))
     logging.info(f"Using {n_workers} workers for processing")
 
     all_chunks = []

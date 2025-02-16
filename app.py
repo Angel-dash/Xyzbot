@@ -3,8 +3,11 @@ import chromadb
 from typing import List, Dict
 import sys
 from pathlib import Path
+from sentence_transformers import SentenceTransformer
 
-project_root = Path(__file__).resolve().parent.parent
+embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+
+project_root = Path(__file__).resolve().parent
 sys.path.append(str(project_root))
 sys.path.append(str(project_root / "Rag"))
 sys.path.append(str(project_root / "Data"))
@@ -47,9 +50,21 @@ Example questions you might ask:
 """
 
 
+def initialize_chroma_client(rag_path: Path):
+    print(f"Initializing ChromaDB at: {rag_path}")
+    client = chromadb.PersistentClient(path=str(rag_path))
+    print(f"Available collections: {client.list_collections()}")
+    try:
+        collection = client.get_collection(name="yt_transcript_collection")
+        print(f"Found existing collection with {len(collection.get()['ids'])} documents")
+    except Exception as e:
+        print(f"No existing collection found, creating new one: {str(e)}")
+        collection = client.create_collection(name="yt_transcript_collection")
+    return collection
+
+
 def format_youtube_url(filename: str) -> str:
     """Convert filename to YouTube URL"""
-    # Extract video ID by removing the timestamp and .txt extension
     video_id = filename.split('_')[0]
     return f"https://www.youtube.com/watch?v={video_id}"
 
@@ -62,22 +77,17 @@ class RAGChatInterface:
 
     def process_query(self, message: str, history: List[List[str]]) -> str:
         """Process a single query and return the response"""
-        # Convert Gradio history format to our conversation history format
         self.conversation_history = [
             {"user": user_msg, "bot": bot_msg}
             for user_msg, bot_msg in history
         ]
 
-        # Enhance query with conversation history
         query_with_history = enhance_query_with_history(message, self.conversation_history)
-
-        # Get relevant documents
         retrieved_docs, metadatas = query_database(self.collection, query_with_history)
 
         if not retrieved_docs:
             return "I apologize, but I couldn't find any relevant information about that in my knowledge base. Could you try rephrasing your question or ask about a different topic covered in the Huberman Lab Podcast?"
 
-        # Generate response
         source_links = [meta["source"] for meta in metadatas]
         response = generate_response(
             self.conversation_history,
@@ -86,11 +96,9 @@ class RAGChatInterface:
             source_links
         )
 
-        # Remove duplicate sources and convert to YouTube URLs
         unique_sources = list(set(source_links))
         youtube_urls = [format_youtube_url(source) for source in unique_sources]
 
-        # Format response with markdown for better readability
         formatted_response = f"{response}\n\n---\n📚 **Source Episodes:**\n"
         for url in youtube_urls:
             formatted_response += f"- {url}\n"
@@ -100,10 +108,8 @@ class RAGChatInterface:
 
 def create_interface(transcripts_folder_path: str, collection) -> gr.Interface:
     """Create and configure the Gradio interface"""
-    # Initialize the RAG chat interface
     rag_chat = RAGChatInterface(transcripts_folder_path, collection)
 
-    # Create the Gradio interface with custom styling
     interface = gr.ChatInterface(
         fn=rag_chat.process_query,
         title="🧠 HubermanBot - Your Neuroscience & Wellness AI Assistant",
@@ -125,20 +131,24 @@ def create_interface(transcripts_folder_path: str, collection) -> gr.Interface:
 
 
 def main():
-    # Get absolute path for ChromaDB
-    project_root = Path(__file__).parent.parent
-    chromadb_path = project_root / "Rag" / "chromadb.db"
-
-    client = chromadb.PersistentClient(path=str(chromadb_path))
-    collection = client.get_or_create_collection(name="yt_transcript_collection")
-
-    # Use absolute path for transcripts folder too
+    # Get paths using pathlib
+    project_root = Path(__file__).parent
+    rag_path = project_root / "Rag" / "chromadb.db"
     transcripts_folder_path = project_root / "Data" / "transcripts"
 
+    # Initialize ChromaDB with proper error handling
+    print("Starting ChromaDB initialization...")
+    collection = initialize_chroma_client(rag_path)
+    print("ChromaDB initialization complete")
+
     # Process any new files
-    process_and_add_new_files(str(transcripts_folder_path), collection)
+    print("Checking for new files...")
+    new_files_added = process_and_add_new_files(str(transcripts_folder_path), collection)
+    if not new_files_added:
+        print("No new files to process")
 
     # Create and launch the interface
+    print("Launching Gradio interface...")
     interface = create_interface(str(transcripts_folder_path), collection)
     interface.launch(share=True, server_port=7860)
 
