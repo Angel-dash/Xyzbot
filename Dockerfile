@@ -36,14 +36,17 @@ COPY . .
 RUN groupadd -g ${USER_GID} appuser && \
     useradd -m -u ${USER_UID} -g appuser appuser
 
-# Create directories and set permissions
-RUN mkdir -p /app/Rag/chromadb.db && \
-    mkdir -p /app/Data && \
+# Set environment variables for persistent storage
+ENV CHROMA_PERSISTENCE_DIRECTORY=/data/chromadb
+ENV TRANSCRIPTS_FOLDER=/data/transcripts
+
+# Optionally create directories (not strictly necessary as code handles it)
+RUN mkdir -p /data/chromadb /data/transcripts
+
+# Create directories with correct permissions (remove unnecessary chromadb.db)
+RUN mkdir -p /app/Rag /app/Data && \
     chown -R appuser:appuser /app
 
 USER appuser
 
-# Make sure your Python code uses this path for ChromaDB
-ENV CHROMA_PERSISTENCE_DIRECTORY=/app/Rag/chromadb.db
-
-CMD ["python", "-m","ui.app"]
+CMD ["python", "app.py"]

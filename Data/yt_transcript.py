@@ -2,10 +2,12 @@ from youtube_transcript_api import YouTubeTranscriptApi
 from Data.get_video_link import video_links_main
 from pathlib import Path
 from datetime import datetime
+import os 
 
 # Dynamically get the root directory of the project
 PROJECT_ROOT = Path(__file__).resolve().parent.parent  # Moves up from /Data/
-TRANSCRIPTS_FOLDER = PROJECT_ROOT / "Data" / "transcripts"
+TRANSCRIPTS_FOLDER = Path(os.getenv("TRANSCRIPTS_FOLDER", str(PROJECT_ROOT / "Data" / "transcripts")))
+
 
 def save_transcript(video_id, transcript_text):
     """
