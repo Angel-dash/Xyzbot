@@ -1,6 +1,7 @@
 import chromadb
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
+from typing import List, Dict, Any, TypedDict
 import google.generativeai as genai
 import os
 import logging
@@ -9,6 +10,7 @@ from Llm.llm_endpoints import get_llm_response
 from utils.get_link import get_source_link
 from Prompts.huberman_prompt import huberman_prompt
 from tqdm import tqdm
+from langgraph.graph import StateGraph, END
 # Configuration
 API_KEY = os.getenv("GOOGLE_API_KEY")
 if API_KEY:
@@ -149,8 +151,207 @@ def generate_response(conversation_history, query_text, retrieved_docs, source_l
     full_response = f"{response}\n\nSources:\n{sources_str}"
     return full_response
 
+class GraphState(TypedDict):
+    """
+    Represents the state of our graph.
 
-def main_workflow(transcripts_folder_path, collection):
+    Attributes:
+        query: The user's query string.
+        chat_history: List of previous conversation turns (user/bot).
+        decision: The routing decision ("retrieve" or "general").
+        retrieved_docs: List of retrieved document chunks.
+        source_links: List of source URLs/identifiers.
+        final_response: The final generated response string.
+        error: Any error message encountered.
+    """
+    query: str
+    chat_history: List[Dict[str, str]]
+    decision: str
+    retrieved_docs: List[str]
+    source_links: List[str]
+    final_response: str
+    error: str 
+
+def query_router_node(state:GraphState)->str:
+    """
+    Determine weather to retrieve  ordocument or generate a general answer
+    Args:
+        state(GraphState): The current state of the graph.
+    Returns:
+        str: The decision("retrieve" or "general")
+    """
+    logging.info("--Exectuting Query Router")
+    query = state['query']
+    chat_history = state['chat_history']
+
+
+    router_prompt = f"""
+    You are a helpful assistant that routes user queries.
+    Based on the user's query and the conversation history, decide if the query
+    requires searching a knowledge base about Huberman Lab podcasts (for specific information
+    mentioned in transcripts) or if it's a general question that can be answered
+    without specific document retrieval.
+
+    Respond with ONLY one word: "retrieve" or "general".
+
+    Conversation History:
+    {'\n'.join([f"{turn['user']}: {turn['bot']}" for turn in chat_history])}
+
+    User Query: {query}
+
+    Decision:
+    """
+    try: 
+        decision = get_llm_response(router_prompt).strip().lower()
+        if decision not in ["retrieve", "general"]:
+            logging.warning(f"Router return unexpected output: {decision}. Defaulting to general")
+            decision = 'general'
+    except Exception as e:
+        logging.error(f"Error during query routing {e}")
+        decision = "general"
+        state['error'] = f"Error routing query {e}"
+    logging.info(f"Router decision: {decision}")
+    state['decision'] #Update the state with decision 
+    return decision
+
+
+def retrieve_node(state:GraphState, collection)->GraphState:
+    """
+    Retrives node based on user query. 
+    Args:
+        state(GraphState): The current state of the graph. 
+        collection: The ChromaDb collection object
+    
+    Returns:
+        GraphState: The updated state with retirved_docs and source_links
+    """
+    logging.info("--Executing Retrivel--")
+    query = state['query']
+    try:
+        retrieved_docs, metadatas= query_database(collection, query)
+        source_links = get_source_link(metadatas)
+        state['retrieved_docs'] = retrieved_docs
+        state['source_links'] = source_links
+    except Exception as e: 
+        logging.error(f"Error during retrivel {e}")
+        state['error'] = f"Error retriveing doc: {e}"
+        state['retrieved_docs'] = []
+        state['source_links'] = []
+    logging.info(f"Retrieved {len(state.get('retrieved_docs', []))} documents.")
+    return state
+
+def generate_rag_response_node(state:GraphState)->GraphState:
+    """
+    Generate a response using retrived documents as context
+    Args:
+        state (GrapState): The current state of the graph. 
+    Returns: 
+        GraphState: The updated state with final response
+    """
+    logging.info("--Generatated Rag Response")
+    query = state['query']
+    chat_history = state["chat_history"]
+    retrieved_docs = state['retrieved_docs']
+    source_links = state['source_links']
+    if not retrieved_docs:
+        logging.warning("No documents retrieved for RAG response.")
+        # Handle case where retrieval failed or found nothing
+        state['final_response'] = "I couldn't find relevant information in my knowledge base for that. Can I help with something else?"
+        return state # Return state early
+
+    try:
+        # Call your original function, adapted to take state components
+        response = generate_response(chat_history, query, retrieved_docs, source_links)
+        state['final_response'] = response
+    except Exception as e:
+        logging.error(f"Error generating RAG response: {e}")
+        state['error'] = f"Error generating response: {e}"
+        state['final_response'] = "Sorry, I encountered an error while trying to generate a response."
+
+
+    logging.info("RAG Response generated.")
+    return state
+
+def generate_general_response_node(state:GraphState)-> GraphState:
+    """
+    Generates a response for general questions without retrieval.
+
+    Args:
+        state (GraphState): The current state of the graph.
+
+    Returns:
+        GraphState: The updated state with the final_response.
+    """
+    logging.info("---Generating General Response---")
+    query = state['query']
+    chat_history = state['chat_history']
+    general_prompt = f"""
+    You are a helpful assistant. Answer the following question based on your general knowledge.
+    Keep the conversation history in mind, but primarily focus on the current query.
+
+    Conversation History:
+    {'\n'.join([f"{turn['user']}: {turn['bot']}" for turn in chat_history])}
+
+    User Query: {query}
+
+    Answer:
+    """
+    try:
+        response = get_llm_response(general_prompt)
+        state['final_response'] = response 
+        state['source_links']= []
+
+    except Exception as e:
+        logging.error(f"Error generating general response: {e}")
+        state['error'] = f"Error generating general response: {e}"
+        state['final_response'] = "Sorry, I encountered an error while trying to answer that general question."
+
+    logging.info("General Response generated.")
+    return state 
+
+def update_history_node(state:GraphState)-> GraphState:
+    """
+    Update the conversation history
+    Args: 
+        state(GraphState): the current state of the graph 
+    Returns:
+        GraphState: The updated state with chat history
+    """
+    logging.info("---Updating History---")
+    query = state['query']
+    response = state['final_response']
+    chat_history = state['chat_history'] 
+    chat_history = update_conversation_history(chat_history, query, response)
+    state['chat_history'] = chat_history
+    logging.info("History updated.")
+    return state
+
+workflow = StateGraph(GraphState)
+workflow.add_node("query_router", query_router_node)
+workflow.add_node("retrieve", lambda state: retrieve_node(state, collection)) 
+workflow.add_node("generate_rag_response", generate_rag_response_node)
+workflow.add_node("generate_general_response", generate_general_response_node)
+workflow.add_node("update_history", update_history_node)
+
+# Set the entry point
+workflow.set_entry_point("query_router")
+
+#Conditional edge cases
+workflow.add_conditional_edges(
+    "query_router",
+    # The function to call to decide the next node
+    lambda state: state['decision'],
+    {
+        "retrieve": "retrieve", # If state['decision'] is 'retrieve', go to 'retrieve' node
+        "general": "generate_general_response", # If state['decision'] is 'general', go to 'generate_general_response' node
+    }
+)
+workflow.add_edge("retrieve", "generate_rag_response")
+workflow.add_edge("generate_rag_response", "update_history")
+workflow.add_edge("generate_general_response", "update_history")
+workflow.set_finish_point("update_history")
+app = workflow.compile()
+def main_workflow_with_langgraph(transcripts_folder_path, collection):
     """Run the full RAG workflow."""
     new_files_added = process_and_add_new_files(transcripts_folder_path, collection)
     if new_files_added:
@@ -165,19 +366,42 @@ def main_workflow(transcripts_folder_path, collection):
         if query_text.lower() == "exit":
             print("Ending the conversation. Goodbye")
             break
+        initial_state: GraphState ={
+            'query':query_text, 
+            'chat_history':conversation_history,
+            'decision':'',
+            'retrieved_docs': [],
+            'source_links': [],
+            'final_response': '',
+            'error': ''
 
-        query_text_with_conversation_history = enhance_query_with_history(query_text, conversation_history)
-        retrived_docs, metadatas = query_database(collection, query_text_with_conversation_history)
-        print("-" * 50)
-        source_link = get_source_link(metadatas)
-        print(source_link)
-        print("-" * 50)
+        }
+        logging.info(f"Starting graph run for query: {query_text}")
+        try:
+            # Invoke the compiled graph
+            final_state = app.invoke(initial_state)
 
-        if not retrived_docs:
-            print("No relevent documents is found")
-            continue
+            # Extract results from the final state
+            response = final_state['final_response']
+            conversation_history = final_state['chat_history'] # Get the updated history
+            source_links = final_state['source_links'] # Get source links if any
+            error = final_state['error']
 
-        response = generate_response(conversation_history, query_text, retrived_docs, source_link)
-        conversation_history = update_conversation_history(conversation_history, query_text, response)
-        print("\nGenerated Response:")
-        print(response)
+            print("-" * 50)
+            if source_links:
+                 print("Sources:")
+                 for link in source_links:
+                     print(link)
+            print("-" * 50)
+
+
+            print("\nGenerated Response:")
+            if error:
+                 print(f"An error occurred: {error}")
+                 print(response) # Print the potentially partial/error response
+            else:
+                 print(response)
+
+        except Exception as e:
+            logging.error(f"An unhandled error occurred during graph execution: {e}")
+            print(f"Sorry, an internal error occurred: {e}")
