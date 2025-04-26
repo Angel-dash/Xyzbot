@@ -238,8 +238,9 @@ def query_router_node(state:GraphState)->dict:
     You are a helpful assistant that routes user queries.
     Based on the user's query and the conversation history, decide if the query
     requires searching a knowledge base about Huberman Lab podcasts (for specific information
-    mentioned in transcripts) or if it's a general question that can be answered
-    without specific document retrieval.
+    mentioned in transcripts) If the question is regarding any thing realted to neuroscinence 
+    or any thing andrew huberman talks in his podcast then you need to use retrieve. Except that
+    you need to use general
 
     Respond with ONLY one word: "retrieve" or "general".
 
@@ -265,31 +266,54 @@ def query_router_node(state:GraphState)->dict:
     return state
 
 
-def retrieve_node(state:GraphState, collection)->GraphState:
+def retrieve_node(state: GraphState, collection, embedding_model) -> GraphState:
     """
-    Retrives node based on user query. 
+    Retrieves documents based on the user query using the provided collection and embedding model.
+
     Args:
-        state(GraphState): The current state of the graph. 
-        collection: The ChromaDb collection object
-    
+        state (GraphState): The current state of the graph.
+        collection: The ChromaDB collection object.
+        embedding_model: The sentence transformer embedding model. # Pass model here
+
     Returns:
-        GraphState: The updated state with retirved_docs and source_links
+        GraphState: The updated state with retrieved_docs and source_links.
     """
-    logging.info("--Executing Retrivel--")
-    query = state['query']
-    try:
-        retrieved_docs, metadatas= query_database(collection, query)
-        source_links = get_source_link(metadatas)
-        state['retrieved_docs'] = retrieved_docs
-        state['source_links'] = source_links
-    except Exception as e: 
-        logging.error(f"Error during retrivel {e}")
-        state['error'] = f"Error retriveing doc: {e}"
+    logging.info("---Executing Retrieval---")
+    query = state.get('query', '')
+
+    if not query or not collection or not embedding_model:
+        logging.error("Retrieval node received invalid state or dependencies.")
         state['retrieved_docs'] = []
         state['source_links'] = []
-    logging.info(f"Retrieved {len(state.get('retrieved_docs', []))} documents.")
-    return state
+        state['error'] = state.get('error', '') + "\nRetrieval setup failed."
+        return state
 
+    try:
+        query_embeddings = embedding_model.encode(query).tolist()
+        # You might add history context to the query here if you want,
+        # but the router already used history to decide *if* to retrieve.
+        # Simple query is often best after the router.
+        results = collection.query(query_embeddings=query_embeddings, n_results=3, include=['documents', 'metadatas'])
+
+        retrieved_docs = results.get('documents', [[]])[0] if results else []
+        metadatas = results.get('metadatas', [[]])[0] if results else []
+
+        # Filter out None results if any (Chroma sometimes returns None)
+        retrieved_docs = [doc for doc in retrieved_docs if doc is not None]
+        metadatas = [meta for meta in metadatas if meta is not None]
+
+        source_links = get_source_link(metadatas) # Use your original function
+
+        state['retrieved_docs'] = retrieved_docs
+        state['source_links'] = source_links
+    except Exception as e:
+        logging.error(f"Error during retrieval: {e}")
+        state['error'] = state.get('error', '') + f"\nError retrieving documents: {e}"
+        state['retrieved_docs'] = [] # Ensure keys exist even on error
+        state['source_links'] = []
+
+    logging.info(f"Retrieved {len(state.get('retrieved_docs', []))} documents.")
+    return state # Return the updated state
 def generate_rag_response_node(state:GraphState)->GraphState:
     """
     Generate a response using retrived documents as context
