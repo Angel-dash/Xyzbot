@@ -75,61 +75,88 @@ def batch_embed_chunks(chunks, embedding_model, batch_size=32):
 
 
 
-def process_and_add_new_files(transcripts_folder_path, collection):
+def process_and_add_new_files(transcripts_folder_path, collection, embedding_model):
     """Process and add new transcript files to the vector database."""
     new_files = get_new_files(transcripts_folder_path, collection)
     if not new_files:
         logging.info("No new files to process")
         return False
 
+    logging.info(f"Found {len(new_files)} new files to process.")
+
     # Use a reasonable number of workers (4 is usually a good default)
-    n_workers = min(8, len(new_files))
-    logging.info(f"Using {n_workers} workers for processing")
+    # Cap workers to avoid overwhelming the system
+    n_workers = min(os.cpu_count() or 1, len(new_files), 8) # Use os.cpu_count as a guide, max 8
+    logging.info(f"Using {n_workers} workers for processing file reading/splitting.")
 
     all_chunks = []
     all_metadata = []
     all_ids = []
+    processed_count = 0
 
-    # Process files in parallel
+    # Process files in parallel (reading and splitting)
     with ProcessPoolExecutor(max_workers=n_workers) as executor:
         futures = {
             executor.submit(process_single_file, os.path.join(transcripts_folder_path, file)): file
             for file in new_files
         }
 
-        for future in as_completed(futures):
+        for future in tqdm(as_completed(futures), total=len(new_files), desc="Processing files"):
             file = futures[future]
             try:
                 chunks, filename = future.result()
+                if not chunks:
+                    logging.warning(f"No chunks generated for {filename}, skipping.")
+                    continue
+
                 file_metadata = [{"source": filename} for _ in range(len(chunks))]
-                file_ids = [f"{filename}_chunk_{i}" for i in range(len(chunks))]
+                # Ensure IDs are unique and valid ChromaDB IDs
+                file_ids = [f"{os.path.splitext(filename)[0]}_{i}" for i in range(len(chunks))]
 
                 all_chunks.extend(chunks)
                 all_metadata.extend(file_metadata)
                 all_ids.extend(file_ids)
 
-                logging.info(f"Processed {filename}")
+                processed_count += 1
+                # logging.info(f"Processed {filename} - {len(chunks)} chunks") # Too verbose in tqdm
+
             except Exception as e:
                 logging.error(f"Error processing {file}: {str(e)}")
-                continue
+                # Continue to the next file
+
+
+    if not all_chunks:
+        logging.info("No valid chunks were processed from new files.")
+        return False
 
     # Process embeddings in batches
-    logging.info(f"Generating embeddings for {len(all_chunks)} chunks")
-    embeddings = batch_embed_chunks(all_chunks)
+    logging.info(f"Generating embeddings for {len(all_chunks)} chunks...")
+    embeddings = batch_embed_chunks(all_chunks, embedding_model)
+
+    if len(embeddings) != len(all_chunks):
+         logging.error("Mismatch between chunk and embedding count. Aborting upsert.")
+         return False
 
     # Add to database in batches
     batch_size = 500
-    for i in range(0, len(all_chunks), batch_size):
-        end_idx = min(i + batch_size, len(all_chunks))
-        collection.upsert(
-            documents=all_chunks[i:end_idx],
-            embeddings=embeddings[i:end_idx],
-            metadatas=all_metadata[i:end_idx],
-            ids=all_ids[i:end_idx]
-        )
-        logging.info(f"Added batch {i // batch_size + 1} to database")
+    logging.info(f"Adding {len(all_chunks)} chunks to database in batches of {batch_size}...")
+    try:
+        for i in tqdm(range(0, len(all_chunks), batch_size), desc="Adding to DB"):
+            end_idx = min(i + batch_size, len(all_chunks))
+            collection.upsert(
+                documents=all_chunks[i:end_idx],
+                embeddings=embeddings[i:end_idx],
+                metadatas=all_metadata[i:end_idx],
+                ids=all_ids[i:end_idx]
+            )
+            # logging.info(f"Added batch {i // batch_size + 1} to database") # Too verbose in tqdm
+        logging.info("All batches added.")
+    except Exception as e:
+        logging.error(f"Error during database upsert: {e}")
+        return False
 
-    logging.info(f"Successfully processed {len(new_files)} files")
+
+    logging.info(f"Successfully processed and added {processed_count} new files.")
     return True
 
 
