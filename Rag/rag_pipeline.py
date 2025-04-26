@@ -4,6 +4,7 @@ from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Any, TypedDict
 import google.generativeai as genai
 import os
+import json
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from Llm.llm_endpoints import get_llm_response
@@ -218,15 +219,17 @@ class GraphState(TypedDict):
     final_response: str
     error: str 
 
-def query_router_node(state:GraphState)->str:
+def query_router_node(state:GraphState)->dict:
     """
     Determine weather to retrieve  ordocument or generate a general answer
     Args:
         state(GraphState): The current state of the graph.
     Returns:
-        str: The decision("retrieve" or "general")
+        dict: The decision("retrieve" or "general")
     """
     logging.info("--Exectuting Query Router")
+    logging.info("Before the chane to the state")
+    logging.info(f"State on entry:\n {json.dumps(state, indent =2)}")
     query = state['query']
     chat_history = state['chat_history']
     conversation_history = '\n'.join([f"{turn['user']}: {turn['bot']}" for turn in chat_history])
@@ -257,7 +260,9 @@ def query_router_node(state:GraphState)->str:
         state['error'] = f"Error routing query {e}"
     logging.info(f"Router decision: {decision}")
     state['decision'] = decision
-    return decision
+    logging.info("After state has been updated")
+    logging.info(f'State on exit : {json.dumps(state, indent=2)}')
+    return state
 
 
 def retrieve_node(state:GraphState, collection)->GraphState:
