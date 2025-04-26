@@ -10,6 +10,7 @@ from Llm.llm_endpoints import get_llm_response
 from utils.get_link import get_source_link
 from Prompts.huberman_prompt import huberman_prompt
 from tqdm import tqdm
+from pathlib import Path
 from langgraph.graph import StateGraph, END
 # Configuration
 API_KEY = os.getenv("GOOGLE_API_KEY")
@@ -33,27 +34,45 @@ def split_text_to_chunks(docs, chunk_size=1000, chunk_overlap=200):
 
 def get_new_files(transcripts_folder_path, collection):
     """Find new transcript files that haven't been processed yet."""
+    # Ensure metadata retrieval is robust
+    try:
+        existing_metadatas = collection.get(include=['metadatas'])['metadatas']
+        existing_files = [meta.get("source") for meta in existing_metadatas if meta and "source" in meta]
+    except Exception as e:
+        logging.warning(f"Could not retrieve existing metadatas from collection: {e}. Assuming no files processed yet.")
+        existing_files = []
+
     all_files = [f for f in os.listdir(transcripts_folder_path) if f.endswith(".txt")]
-    existing_files = [meta["source"] for meta in collection.get()['metadatas']]
-    return [f for f in all_files if f not in existing_files]
+    return [f for f in all_files if os.path.basename(f) not in existing_files]
 
 
 def process_single_file(file_path):
     """Process a single file and return its chunks."""
-    with open(file_path, 'r') as f:
-        content = f.read()
-    chunks = split_text_to_chunks(content)
-    return chunks, os.path.basename(file_path)
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f: # Specify encoding
+            content = f.read()
+        chunks = split_text_to_chunks(content)
+        return chunks, os.path.basename(file_path)
+    except Exception as e:
+        logging.error(f"Error reading or splitting file {file_path}: {e}")
+        return [], os.path.basename(file_path)
 
 
-def batch_embed_chunks(chunks, batch_size=32):
+def batch_embed_chunks(chunks, embedding_model, batch_size=32):
     """Embed chunks in batches."""
     embeddings = []
-    for i in tqdm(range(0, len(chunks), batch_size),desc = "Embedding chunks"):
-        batch = chunks[i:i + batch_size]
-        batch_embeddings = embedding_model.encode(batch, show_progress_bar=True)
-        embeddings.extend(batch_embeddings.tolist())
+    if not chunks: return []
+    try:
+        # show_progress_bar=False when called from background process maybe?
+        for i in tqdm(range(0, len(chunks), batch_size),desc = "Embedding chunks"):
+            batch = chunks[i:i + batch_size]
+            batch_embeddings = embedding_model.encode(batch, show_progress_bar=False) # Set to False for batch process logging clarity
+            embeddings.extend(batch_embeddings.tolist())
+    except Exception as e:
+         logging.error(f"Error during batch embedding: {e}")
+         return [] # Return empty on error
     return embeddings
+
 
 
 def process_and_add_new_files(transcripts_folder_path, collection):
@@ -326,82 +345,164 @@ def update_history_node(state:GraphState)-> GraphState:
     logging.info("History updated.")
     return state
 
-workflow = StateGraph(GraphState)
-workflow.add_node("query_router", query_router_node)
-workflow.add_node("retrieve", lambda state: retrieve_node(state, collection)) 
-workflow.add_node("generate_rag_response", generate_rag_response_node)
-workflow.add_node("generate_general_response", generate_general_response_node)
-workflow.add_node("update_history", update_history_node)
+def setup_rag_pipeline(chromadb_path :str, transcripts_folder_path:str, collection_name:str="yt_transcripts_collection"):
+    """
+    Initializes ChromaDB, runs ingestion, and sets up the LangGraph pipeline.
 
-# Set the entry point
-workflow.set_entry_point("query_router")
+    Args:
+        chromadb_path (str): Path to the ChromaDB directory.
+        transcripts_folder_path (str): Path to the transcripts folder.
+        collection_name (str): Name for the ChromaDB collection.
 
-#Conditional edge cases
-workflow.add_conditional_edges(
-    "query_router",
-    # The function to call to decide the next node
-    lambda state: state['decision'],
-    {
-        "retrieve": "retrieve", # If state['decision'] is 'retrieve', go to 'retrieve' node
-        "general": "generate_general_response", # If state['decision'] is 'general', go to 'generate_general_response' node
-    }
-)
-workflow.add_edge("retrieve", "generate_rag_response")
-workflow.add_edge("generate_rag_response", "update_history")
-workflow.add_edge("generate_general_response", "update_history")
-workflow.set_finish_point("update_history")
-app = workflow.compile()
-def main_workflow_with_langgraph(transcripts_folder_path, collection):
-    """Run the full RAG workflow."""
-    new_files_added = process_and_add_new_files(transcripts_folder_path, collection)
-    if new_files_added:
-        logging.info("New transcripts added to the database.")
-    else:
-        logging.info("No new files found. Using existing database.")
+    Returns:
+        tuple: (compiled_langgraph_app, chromadb_collection_object, embedding_model)
+               Returns None, None, None if setup fails.
+    """
+    logging.info("Starting RAG pipeline setup...")
+    try:
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if api_key:
+            genai.configure(api_key=api_key)
+            logging.info("Google Generative AI configured.")
+        else:
+            logging.warning("GOOGLE_API_KEY environment variable not set. Generative AI calls may fail.")
+        # Initialize ChromaDB client and get collection
+        client = chromadb.PersistentClient(path=chromadb_path)
 
-    conversation_history = []
+        collection = client.get_or_create_collection(name=collection_name)
+        logging.info(f"ChromaDB collection '{collection.name}' ready at {chromadb_path}.")
+
+        # Initialize embedding model
+        # This can be resource intensive, do it once
+        logging.info("Loading embedding model...")
+        embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+        logging.info("Embedding model loaded.")
+
+
+        # Run the ingestion process
+        logging.info("Checking for new transcripts and ingesting...")
+        process_and_add_new_files(transcripts_folder_path, collection, embedding_model)
+        logging.info("Ingestion process finished.")
+
+        # --- Build the LangGraph ---
+        logging.info("Building LangGraph workflow...")
+        workflow = StateGraph(GraphState)
+
+        # Add nodes - Pass necessary dependencies (collection, embedding_model)
+        workflow.add_node("query_router", query_router_node)
+        workflow.add_node("retrieve", lambda state: retrieve_node(state, collection, embedding_model)) # Pass dependencies via lambda
+        workflow.add_node("generate_rag_response", generate_rag_response_node)
+        workflow.add_node("generate_general_response", generate_general_response_node)
+        workflow.add_node("update_history", update_history_node)
+
+        # Set the entry point
+        workflow.set_entry_point("query_router")
+
+        # Add edges
+        workflow.add_conditional_edges(
+            "query_router",
+            lambda state: state['decision'], # Logic based on the 'decision' key in state
+            {
+                "retrieve": "retrieve",
+                "general": "generate_general_response",
+
+            }
+        )
+
+        workflow.add_edge("retrieve", "generate_rag_response")
+        workflow.add_edge("generate_rag_response", "update_history")
+        workflow.add_edge("generate_general_response", "update_history")
+
+        # Set the finish point
+        workflow.set_finish_point("update_history")
+
+        # Compile the graph
+        logging.info("Compiling LangGraph workflow...")
+        app = workflow.compile()
+        logging.info("LangGraph workflow compiled successfully.")
+
+        return app, collection, embedding_model # Return compiled app and other needed objects
+
+    except Exception as e:
+        logging.critical(f"FATAL ERROR during RAG pipeline setup: {e}", exc_info=True)
+        return None, None, None 
+def run_chat_loop(compiled_app, collection): # collection might not be strictly needed here but can be useful
+    """Runs the interactive chat loop using the compiled LangGraph app."""
+
+    if compiled_app is None or collection is None:
+        logging.error("RAG pipeline setup failed. Cannot run chat loop.")
+        print("Failed to initialize the chatbot. Please check logs.")
+        return
+
+    conversation_history = [] # Initialize history for the session
+
+    print("\nChatbot initialized. Type your query or 'exit' to quit.")
 
     while True:
-        query_text = input("\nEnter your query(or type 'exit' to end):").strip()
+        query_text = input("\nUser: ").strip()
         if query_text.lower() == "exit":
-            print("Ending the conversation. Goodbye")
+            print("Ending the conversation. Goodbye!")
             break
-        initial_state: GraphState ={
-            'query':query_text, 
-            'chat_history':conversation_history,
-            'decision':'',
+        if not query_text:
+            print("Please enter a query.")
+            continue
+
+        # Prepare the initial state for the graph run
+        initial_state: GraphState = {
+            'query': query_text,
+            'chat_history': conversation_history,
+            'decision': '', # This will be set by the router node
             'retrieved_docs': [],
             'source_links': [],
             'final_response': '',
-            'error': ''
-
+            'error': '' # Initialize error state
         }
-        logging.info(f"Starting graph run for query: {query_text}")
+
+        logging.info(f"Invoking graph for query: '{query_text[:50]}...'")
         try:
-            # Invoke the compiled graph
-            final_state = app.invoke(initial_state)
+            # Invoke the compiled graph to process the query
+            final_state = compiled_app.invoke(initial_state)
 
             # Extract results from the final state
-            response = final_state['final_response']
-            conversation_history = final_state['chat_history'] # Get the updated history
-            source_links = final_state['source_links'] # Get source links if any
-            error = final_state['error']
+            response = final_state.get('final_response', "Sorry, I couldn't generate a response.")
+            # Update the external history with the history managed by the graph
+            conversation_history = final_state.get('chat_history', conversation_history)
+            source_links = final_state.get('source_links', [])
+            error = final_state.get('error', '')
 
             print("-" * 50)
             if source_links:
                  print("Sources:")
-                 for link in source_links:
-                     print(link)
+                 # Ensure source links are printed clearly
+                 for i, link in enumerate(source_links):
+                     print(f"- Source {i+1}: {link}")
             print("-" * 50)
 
-
-            print("\nGenerated Response:")
+            print("\nBot:")
             if error:
-                 print(f"An error occurred: {error}")
-                 print(response) # Print the potentially partial/error response
-            else:
-                 print(response)
+                 print(f"An internal process encountered an issue: {error}") # Inform user about potential error
+            print(response) # Always print the response, even if there was an error downstream
+
 
         except Exception as e:
-            logging.error(f"An unhandled error occurred during graph execution: {e}")
-            print(f"Sorry, an internal error occurred: {e}")
+            logging.error(f"An unhandled error occurred during graph execution: {e}", exc_info=True)
+            print(f"Sorry, an unexpected error occurred: {e}")
+ 
+
+if __name__ == "__main__":
+    current_dir = Path(__file__).parent
+    project_root = current_dir.parent 
+    default_transcripts_folder = project_root / "Data" / "transcripts"
+    default_chromadb_path = current_dir / "chromadb.db" 
+    # This runs ingestion and compiles the graph ONCE when the script starts
+    rag_app, chroma_collection, embedding_model_instance = setup_rag_pipeline(
+        chromadb_path=str(default_chromadb_path),
+        transcripts_folder_path=str(default_transcripts_folder)
+    )
+
+    # --- Run the chat loop ---
+    # Only run the chat loop if setup was successful
+    if rag_app and chroma_collection:
+        run_chat_loop(rag_app, chroma_collection)
+    else:
+        print("\nChatbot failed to start due to setup errors.")
