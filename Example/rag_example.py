@@ -2,20 +2,22 @@ import sys
 import chromadb
 from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-# transcripts_folder_path = '/home/nightwing/Codes/Xyzbot/Data/transcripts'
-# transcripts_folder_path = 'Data/transcripts'
-transcripts_folder_path = PROJECT_ROOT / "Data" / "transcripts"
-chromadb_path = PROJECT_ROOT / "Rag" / "chromadb.db"
-client = chromadb.PersistentClient(path=str(chromadb_path))
-
-collection = client.get_or_create_collection(name="yt_transcript_collection")
-collections = client.list_collections()
-print(f"Available collections: {collections}")
 sys.path.append(str(PROJECT_ROOT))
 sys.path.append(str(PROJECT_ROOT / "Rag"))
-# print("Python path:", sys.path)
-from Rag.rag_pipeline import main_workflow
+transcripts_folder_path_str = str(PROJECT_ROOT / "Data" / "transcripts")
+chromadb_path_str = str(PROJECT_ROOT / "Rag" / "chromadb.db")
 
-# Run the application
+collection_name = "yt_transcript_collection"
+
+from Rag.rag_pipeline import run_chat_loop,setup_rag_pipeline
+
 if __name__ == "__main__":
-    main_workflow(transcripts_folder_path, collection)
+    compiled_app, collection, embedding_model = setup_rag_pipeline(
+        chromadb_path=chromadb_path_str,
+        transcripts_folder_path=transcripts_folder_path_str,
+        collection_name=collection_name
+    )
+    if compiled_app and collection:
+        run_chat_loop(compiled_app, collection)
+    else:
+        print("\nApplication failed during setup. Exiting.")

@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from sentence_transformers import SentenceTransformer
 
+import os 
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 
 project_root = Path(__file__).resolve().parent
@@ -23,6 +24,7 @@ from Rag.rag_pipeline import (
     update_conversation_history,
     process_and_add_new_files
 )
+from Data.yt_transcript import TRANSCRIPTS_FOLDER
 
 INTRODUCTION = """
 # 🧠 Welcome to HubermanBot!
@@ -133,8 +135,9 @@ def create_interface(transcripts_folder_path: str, collection) -> gr.Interface:
 def main():
     # Get paths using pathlib
     project_root = Path(__file__).parent
-    rag_path = project_root / "Rag" / "chromadb.db"
-    transcripts_folder_path = project_root / "Data" / "transcripts"
+    # rag_path = project_root / "Rag" / "chromadb.db"
+    rag_path = os.getenv("CHROMA_PERSISTENCE_DIRECTORY",str(project_root / "Rag" / "chromadb.db"))
+    transcripts_folder_path = TRANSCRIPTS_FOLDER
 
     # Initialize ChromaDB with proper error handling
     print("Starting ChromaDB initialization...")
