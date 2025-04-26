@@ -202,9 +202,9 @@ def query_router_node(state:GraphState)->str:
     logging.info("--Exectuting Query Router")
     query = state['query']
     chat_history = state['chat_history']
+    conversation_history = '\n'.join([f"{turn['user']}: {turn['bot']}" for turn in chat_history])
 
-
-    router_prompt = f"""
+    router_prompt = """
     You are a helpful assistant that routes user queries.
     Based on the user's query and the conversation history, decide if the query
     requires searching a knowledge base about Huberman Lab podcasts (for specific information
@@ -214,12 +214,11 @@ def query_router_node(state:GraphState)->str:
     Respond with ONLY one word: "retrieve" or "general".
 
     Conversation History:
-    {'\n'.join([f"{turn['user']}: {turn['bot']}" for turn in chat_history])}
+    {history}
 
     User Query: {query}
-
     Decision:
-    """
+    """.format(history=conversation_history, query=query)
     try: 
         decision = get_llm_response(router_prompt).strip().lower()
         if decision not in ["retrieve", "general"]:
@@ -230,7 +229,7 @@ def query_router_node(state:GraphState)->str:
         decision = "general"
         state['error'] = f"Error routing query {e}"
     logging.info(f"Router decision: {decision}")
-    state['decision'] #Update the state with decision 
+    state['decision'] = decision
     return decision
 
 
@@ -304,17 +303,18 @@ def generate_general_response_node(state:GraphState)-> GraphState:
     logging.info("---Generating General Response---")
     query = state['query']
     chat_history = state['chat_history']
-    general_prompt = f"""
+    conversation_history = '\n'.join([f"{turn['user']}: {turn['bot']}" for turn in chat_history])
+    general_prompt = """
     You are a helpful assistant. Answer the following question based on your general knowledge.
     Keep the conversation history in mind, but primarily focus on the current query.
 
     Conversation History:
-    {'\n'.join([f"{turn['user']}: {turn['bot']}" for turn in chat_history])}
+    {history}
 
     User Query: {query}
 
     Answer:
-    """
+    """.format(history = conversation_history, query=query)
     try:
         response = get_llm_response(general_prompt)
         state['final_response'] = response 
@@ -500,8 +500,6 @@ if __name__ == "__main__":
         transcripts_folder_path=str(default_transcripts_folder)
     )
 
-    # --- Run the chat loop ---
-    # Only run the chat loop if setup was successful
     if rag_app and chroma_collection:
         run_chat_loop(rag_app, chroma_collection)
     else:
